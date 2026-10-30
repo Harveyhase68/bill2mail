@@ -1,0 +1,41 @@
+# Einfacher Workflow zum Hochladen statischer HTML-Seiten zu GitHub Pages
+name: Deploy static content to Pages
+
+on:
+  # Löst den Workflow aus, wenn du etwas in den main-Branch pushst
+  push:
+    branches: ["main"]
+
+  # Erlaubt dir auch, den Workflow manuell im GitHub-Tab "Actions" zu starten
+  workflow_dispatch:
+
+# Sichert die Berechtigungen für das Deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Erlaube nur ein gleichzeitiges Deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: cdn
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Sagt GitHub: Nimm einfach das Hauptverzeichnis (wo deine index.html liegt)
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
