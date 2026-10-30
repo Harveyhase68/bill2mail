@@ -12,7 +12,7 @@ pub struct Splitter {
 
 impl Splitter {
     pub fn laden(bytes: &[u8]) -> Result<Self, String> {
-        let doc = Document::load_mem(bytes).map_err(|e| format!("Fehler beim Laden der PDF: {e}"))?;
+        let doc = Document::load_mem(bytes).map_err(|e| crate::i18n::tr(&format!("Fehler beim Laden der PDF: {e}"), &format!("Error loading the PDF: {e}")))?;
         let seiten = doc.get_pages().into_values().collect();
         Ok(Splitter { doc, seiten })
     }
@@ -22,7 +22,7 @@ impl Splitter {
     pub fn teil(&self, start: usize, end: usize) -> Result<Document, String> {
         let n = self.seiten.len();
         if start > end || end >= n {
-            return Err(format!("Seitenbereich ungültig: {} bis {} (PDF hat {n} Seiten)", start + 1, end + 1));
+            return Err(crate::i18n::tr(&format!("Seitenbereich ungültig: {} bis {} (PDF hat {n} Seiten)", start + 1, end + 1), &format!("Invalid page range: {} to {} (PDF has {n} pages)", start + 1, end + 1)));
         }
         let weg: Vec<u32> = (0..n).filter(|i| *i < start || *i > end).map(|i| i as u32 + 1).collect();
         let mut d = self.doc.clone();

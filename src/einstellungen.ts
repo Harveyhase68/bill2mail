@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { spracheWechseln, sprache, t, type Sprache } from "./i18n";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Einstellungen, UeberwachungsStatus } from "./types";
+import type { Einstellungen, LizenzStatus, UeberwachungsStatus } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
@@ -12,6 +13,13 @@ export class EinstellungenView {
 
   constructor() {
     $("s-save").addEventListener("click", () => void this.save().catch((e) => this.status(String(e), true)));
+    $<HTMLSelectElement>("s-sprache").value = sprache();
+    $<HTMLSelectElement>("s-sprache").addEventListener("change", (e) => {
+      const neu = (e.target as HTMLSelectElement).value as Sprache;
+      // Eingaben sichern, dann Oberfläche in der neuen Sprache neu laden (gilt nur für diese Sitzung)
+      void this.save().catch(() => {}).finally(() => spracheWechseln(neu));
+    });
+    $("s-lic-load").addEventListener("click", () => void this.lizenzLaden());
     $("s-ue-pick").addEventListener("click", async () => {
       const dir = await open({ directory: true, multiple: false });
       if (typeof dir === "string") input("s-ue-ordner").value = dir;
@@ -33,6 +41,30 @@ export class EinstellungenView {
     if (msg && !isError) this.statusTimer = window.setTimeout(() => (el.textContent = ""), 6000);
   }
 
+  /** Zeigt den Lizenzstatus in den Einstellungen und im Demo-Banner. */
+  static async lizenzAnzeigen() {
+    const s = await invoke<LizenzStatus>("lizenz_status");
+    $("s-lic-status").textContent = s.lizenziert
+      ? t("Lizenziert für {k}", { k: s.kunde }) + (s.bis ? t(" · gültig bis {d}", { d: s.bis }) : "")
+      : s.meldung;
+    $("s-lic-status").classList.toggle("error", !s.lizenziert);
+    $("demo").hidden = s.lizenziert;
+    return s;
+  }
+
+  private async lizenzLaden() {
+    const datei = await open({ multiple: false, filters: [{ name: t("Lizenz (*.lic)"), extensions: ["lic"] }] });
+    if (typeof datei !== "string") return;
+    try {
+      await invoke<LizenzStatus>("lizenz_installieren", { pfad: datei });
+      await EinstellungenView.lizenzAnzeigen();
+      await this.load();
+      this.status(t("Lizenz übernommen."));
+    } catch (e) {
+      this.status(String(e), true);
+    }
+  }
+
   private ueStatus(s: UeberwachungsStatus) {
     const el = $("s-ue-status");
     el.textContent = s.meldung;
@@ -43,6 +75,7 @@ export class EinstellungenView {
     const e = await invoke<Einstellungen & { passwort_gesetzt: boolean; ueberwachung: UeberwachungsStatus }>(
       "einstellungen_laden",
     );
+    await EinstellungenView.lizenzAnzeigen();
     input("s-ue-aktiv").checked = e.ueberwachung_aktiv;
     input("s-ue-ordner").value = e.ueberwachung_ordner;
     input("s-toleranz").value = String(e.toleranz_pt);
@@ -52,7 +85,7 @@ export class EinstellungenView {
     $<HTMLSelectElement>("s-sicherheit").value = e.sicherheit;
     input("s-user").value = e.smtp_user;
     input("s-pass").value = "";
-    input("s-pass").placeholder = e.passwort_gesetzt ? "(gespeichert – leer lassen zum Beibehalten)" : "";
+    input("s-pass").placeholder = e.passwort_gesetzt ? t("(gespeichert – leer lassen zum Beibehalten)") : "";
     input("s-absender").value = e.absender;
     input("s-absender-name").value = e.absender_name;
     input("s-test-an").value = e.test_empfaenger;
@@ -82,14 +115,14 @@ export class EinstellungenView {
     });
     this.ueStatus(ue);
     input("s-pass").value = "";
-    if (pass !== "") input("s-pass").placeholder = "(gespeichert – leer lassen zum Beibehalten)";
-    this.status("Gespeichert.");
+    if (pass !== "") input("s-pass").placeholder = t("(gespeichert – leer lassen zum Beibehalten)");
+    this.status(t("Gespeichert."));
   }
 
   private async test() {
     try {
       await this.save();
-      this.status("Sende Test-Mail …");
+      this.status(t("Sende Test-Mail …"));
       this.status(await invoke<string>("test_mail_senden"));
     } catch (e) {
       this.status(String(e), true);

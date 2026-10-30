@@ -18,6 +18,7 @@
         <button class="tab" data-view="einstellungen">Einstellungen</button>
       </nav>
     </header>
+    <div id="demo" class="demo-banner" hidden>Demo-Version – Versenden ist erst mit Lizenz möglich (Einstellungen → Lizenz).</div>
 
     <main id="view-editor" class="view">
       <div class="toolbar">
@@ -103,6 +104,22 @@
           <legend>Erkennung</legend>
           <label>Toleranz der Rahmen (in Punkten, 0–200)<input id="s-toleranz" type="number" min="0" max="200" step="1" /></label>
           <p class="hint small">Wie weit der Text vertikal vom Rahmen abweichen darf und trotzdem gefunden wird (z. B. wenn die Adresse eine Zeile länger ist). 72 Punkte = 1 Zoll = 2,54 cm; eine Textzeile hat etwa 10–12 Punkte. Standard: 30. Zu große Werte können fremden Text treffen.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Sprache</legend>
+          <label>Sprache
+            <select id="s-sprache">
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <p class="hint small">Gilt bis zum Beenden des Programms. Beim nächsten Start wird wieder die Windows-Sprache verwendet.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Lizenz</legend>
+          <p id="s-lic-status" class="lic-status"></p>
+          <div class="folder-row"><button id="s-lic-load" type="button">Lizenzdatei laden …</button></div>
+          <p class="hint small">Ohne Lizenz läuft die Demo: Rahmen setzen, Analyse, Vorschau und Test-Mail funktionieren, Versenden und Ordnerüberwachung sind gesperrt.</p>
         </fieldset>
         <fieldset class="wide">
           <legend>Automatik: PDF-Ordner überwachen</legend>

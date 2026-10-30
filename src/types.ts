@@ -109,6 +109,13 @@ export interface UeberwachungsStatus {
   meldung: string;
 }
 
+export interface LizenzStatus {
+  lizenziert: boolean;
+  kunde: string;
+  bis: string | null;
+  meldung: string;
+}
+
 export interface NeuePdf {
   pfad: string;
   fehler: string | null;

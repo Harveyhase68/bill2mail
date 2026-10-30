@@ -5,11 +5,13 @@ import { AutoFenster } from "./auto";
 import { Editor } from "./editor";
 import { EinstellungenView } from "./einstellungen";
 import { KundenView } from "./kunden";
+import { spracheStarten, t } from "./i18n";
 import { VersandView } from "./versand";
 import type { FrameDef } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+function start() {
 // ------------------------------------------------------------------ Vorlage
 
 let saveTimer = 0;
@@ -49,11 +51,11 @@ async function openPdf() {
   try {
     await editor.open(picked);
     currentPdf = picked;
-    $("file-name").textContent = `${picked.split(/[\\/]/).pop()} – ${editor.pageCount} Seiten`;
+    $("file-name").textContent = t("{name} – {n} Seiten", { name: picked.split(/[\\/]/).pop() ?? "", n: editor.pageCount });
     $<HTMLButtonElement>("btn-analyse").disabled = false;
     $("analyse").hidden = true;
   } catch (e) {
-    $("file-name").textContent = `Fehler: ${e}`;
+    $("file-name").textContent = t("Fehler: {e}", { e: String(e) });
   }
 }
 
@@ -84,3 +86,7 @@ for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
 }
 
 void loadVorlage();
+void EinstellungenView.lizenzAnzeigen().catch(() => {});
+}
+
+void spracheStarten().then(start);

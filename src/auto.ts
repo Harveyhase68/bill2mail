@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { t } from "./i18n";
 import type { FrameDef, NeuePdf, VersandErgebnis, Vorschau } from "./types";
 import { el, ergebnisTeile, versandSperre, vorschauTeile } from "./ui";
 
@@ -39,7 +40,7 @@ export class AutoFenster {
   }
 
   private zeigeQueue() {
-    $("auto-queue").textContent = this.queue.length > 0 ? `+ ${this.queue.length} weitere PDF warten` : "";
+    $("auto-queue").textContent = this.queue.length > 0 ? t("+ {n} weitere PDF warten", { n: this.queue.length }) : "";
   }
 
   private buttons() {
@@ -47,7 +48,7 @@ export class AutoFenster {
     $<HTMLButtonElement>("auto-senden").hidden = this.phase === "fertig" || this.phase === "fehler";
     $<HTMLButtonElement>("auto-senden").disabled = this.phase !== "bereit" || this.zuSenden === 0;
     $<HTMLButtonElement>("auto-abbrechen").textContent =
-      this.phase === "fertig" || this.phase === "fehler" ? "Schließen" : nochSendend ? "Versand abbrechen" : "Abbrechen";
+      this.phase === "fertig" || this.phase === "fehler" ? t("Schließen") : nochSendend ? t("Versand abbrechen") : t("Abbrechen");
   }
 
   private hinweis(t: string) {
@@ -73,12 +74,12 @@ export class AutoFenster {
       this.zeigeFehler(p.fehler);
       return;
     }
-    $("auto-body").replaceChildren(el("p", "hint", "Analysiere PDF …"));
+    $("auto-body").replaceChildren(el("p", "hint", t("Analysiere PDF …")));
     try {
       const json = await invoke<string | null>("vorlage_laden");
       const frames: FrameDef[] = json ? (JSON.parse(json).frames ?? []) : [];
       if (frames.length === 0) {
-        this.zeigeFehler("Es gibt noch keine Vorlage. Bitte zuerst im Reiter „Vorlage & PDF“ die Rahmen setzen.");
+        this.zeigeFehler(t("Es gibt noch keine Vorlage. Bitte zuerst im Reiter „Vorlage & PDF“ die Rahmen setzen."));
         return;
       }
       const v = await invoke<Vorschau>("versand_vorschau", { path: p.pfad, frames });
@@ -89,8 +90,8 @@ export class AutoFenster {
       $("auto-body").replaceChildren(...vorschauTeile(v, false));
       this.hinweis(
         this.zuSenden === 0
-          ? "Es gibt nichts zu senden."
-          : `${this.zuSenden} E-Mails werden mit „Versenden“ sofort an die Kunden gesendet.`,
+          ? t("Es gibt nichts zu senden.")
+          : t("{n} E-Mails werden mit „Versenden“ sofort an die Kunden gesendet.", { n: this.zuSenden }),
       );
       this.buttons();
     } catch (e) {
@@ -103,7 +104,7 @@ export class AutoFenster {
   private zeigeFehler(msg: string) {
     this.phase = "fehler";
     $("auto-body").replaceChildren(el("p", "error-text", msg));
-    this.hinweis("Es wurde nichts gesendet.");
+    this.hinweis(t("Es wurde nichts gesendet."));
     this.buttons();
   }
 
@@ -111,7 +112,7 @@ export class AutoFenster {
     if (this.phase === "sendet") {
       void invoke("versand_abbrechen");
       $<HTMLButtonElement>("auto-abbrechen").disabled = true;
-      this.hinweis("Abbruch angefordert – die laufende Mail wird noch beendet …");
+      this.hinweis(t("Abbruch angefordert – die laufende Mail wird noch beendet …"));
       return;
     }
     $<HTMLButtonElement>("auto-abbrechen").disabled = false;
@@ -122,7 +123,7 @@ export class AutoFenster {
     const p = this.aktuell;
     if (!p || this.phase !== "bereit") return;
     if (versandSperre.aktiv) {
-      this.hinweis("Es läuft bereits ein anderer Versand – bitte warten.");
+      this.hinweis(t("Es läuft bereits ein anderer Versand – bitte warten."));
       return;
     }
     versandSperre.aktiv = true;
@@ -131,7 +132,7 @@ export class AutoFenster {
     const bar = el("progress");
     bar.max = this.zuSenden;
     bar.value = 0;
-    const label = el("span", "", "Bereite vor …");
+    const label = el("span", "", t("Bereite vor …"));
     const box = el("div", "v-progress");
     box.append(bar, label);
     $("auto-body").replaceChildren(box);
@@ -139,7 +140,7 @@ export class AutoFenster {
     const unlisten = await listen<{ aktuell: number; gesamt: number; text: string }>("versand-fortschritt", (e) => {
       bar.max = e.payload.gesamt;
       bar.value = e.payload.aktuell - 1;
-      label.textContent = `${e.payload.aktuell} von ${e.payload.gesamt}: ${e.payload.text}`;
+      label.textContent = t("{a} von {g}: {t}", { a: e.payload.aktuell, g: e.payload.gesamt, t: e.payload.text });
     });
     try {
       const erg = await invoke<VersandErgebnis>("versenden", { path: p.pfad, frames: this.vorlageFrames });
@@ -147,7 +148,7 @@ export class AutoFenster {
       $("auto-body").replaceChildren(...ergebnisTeile(erg));
       this.hinweis("");
     } catch (e) {
-      this.zeigeFehler(`Versand nicht durchgeführt: ${e}`);
+      this.zeigeFehler(t("Versand nicht durchgeführt: {e}", { e: String(e) }));
     } finally {
       unlisten();
       versandSperre.aktiv = false;

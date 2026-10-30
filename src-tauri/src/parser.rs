@@ -31,11 +31,11 @@ pub enum FrameType {
 impl FrameType {
     fn name(self) -> &'static str {
         match self {
-            FrameType::Rot => "Formulartyp (rot)",
-            FrameType::Blau => "Kundennummer (blau)",
-            FrameType::Gruen => "Rechnungsnummer (grün)",
-            FrameType::Violett => "Seitennummer (violett)",
-            FrameType::Grau => "Kundenname (grau)",
+            FrameType::Rot => crate::i18n::tr_static("Formulartyp (rot)", "Form type (red)"),
+            FrameType::Blau => crate::i18n::tr_static("Kundennummer (blau)", "Customer number (blue)"),
+            FrameType::Gruen => crate::i18n::tr_static("Rechnungsnummer (grün)", "Invoice number (green)"),
+            FrameType::Violett => crate::i18n::tr_static("Seitennummer (violett)", "Page number (violet)"),
+            FrameType::Grau => crate::i18n::tr_static("Kundenname (grau)", "Customer name (gray)"),
         }
     }
 }
@@ -76,7 +76,7 @@ fn parse_muster(params: &str) -> Result<Vec<Muster>, String> {
         };
         let rest = &item[star + 2..];
         let Some(close) = rest.find(']') else {
-            return Err(format!("\"{item}\": schließende Klammer ] fehlt"));
+            return Err(crate::i18n::tr(&format!("\"{item}\": schließende Klammer ] fehlt"), &format!("\"{item}\": closing bracket ] missing")));
         };
         let var = match rest[..close].trim().to_uppercase().as_str() {
             "KU" => Var::Ku,
@@ -214,9 +214,9 @@ fn vorlage_bauen(frames: &[FrameDef]) -> Result<(Vorlage, Vec<String>), String> 
     }
     let blau = v.frames.iter().find(|(f, _)| f.kind == FrameType::Blau);
     match blau {
-        None => return Err("Der blaue Kundennummer-Rahmen fehlt oder hat keine Parameter.".into()),
+        None => return Err(crate::i18n::tr("Der blaue Kundennummer-Rahmen fehlt oder hat keine Parameter.", "The blue customer number frame is missing or has no parameters.")),
         Some((_, m)) if !m.iter().any(|m| m.var == Some(Var::Ku)) => {
-            return Err("Blauer Rahmen: Der Parameter muss *[KU] enthalten, z. B. Kundennummer*[KU].".into());
+            return Err(crate::i18n::tr("Blauer Rahmen: Der Parameter muss *[KU] enthalten, z. B. Kundennummer*[KU].", "Blue frame: the parameter must contain *[KU], e.g. Customer number*[KU]."));
         }
         _ => {}
     }
@@ -353,12 +353,12 @@ fn gruppieren(proben: &[SeitenProbe], v: &Vorlage, warnungen: &mut Vec<String>) 
             };
             if !fremd {
                 if r.kundennummer.is_empty() {
-                    r.warnungen.push("Kundennummer nicht gefunden".into());
+                    r.warnungen.push(crate::i18n::tr("Kundennummer nicht gefunden", "Customer number not found"));
                 }
                 let re_erwartet = v.hat(FrameType::Gruen)
                     || v.frames.iter().any(|(_, m)| m.iter().any(|m| m.var == Some(Var::Re)));
                 if re_erwartet && r.rechnungsnummer.is_empty() {
-                    r.warnungen.push("Rechnungsnummer nicht gefunden".into());
+                    r.warnungen.push(crate::i18n::tr("Rechnungsnummer nicht gefunden", "Invoice number not found"));
                 }
             }
             gruppen.push(Gruppe { r, fremd });
@@ -366,25 +366,26 @@ fn gruppieren(proben: &[SeitenProbe], v: &Vorlage, warnungen: &mut Vec<String>) 
             g.r.end_page = idx;
             if let Some(k) = &p.kundennummer {
                 if !g.fremd && !g.r.kundennummer.is_empty() && *k != g.r.kundennummer {
-                    g.r.warnungen.push(format!(
-                        "Seite {}: abweichende Kundennummer {k} (erwartet {})",
-                        idx + 1,
-                        g.r.kundennummer
+                    g.r.warnungen.push(crate::i18n::tr(
+                        &format!("Seite {}: abweichende Kundennummer {k} (erwartet {})", idx + 1, g.r.kundennummer),
+                        &format!("Page {}: different customer number {k} (expected {})", idx + 1, g.r.kundennummer),
                     ));
                 }
             }
         } else {
-            warnungen.push(format!("Seite {} gehört zu keiner Rechnung (vor der ersten erkannten Rechnung).", idx + 1));
+            warnungen.push(crate::i18n::tr(
+                &format!("Seite {} gehört zu keiner Rechnung (vor der ersten erkannten Rechnung).", idx + 1),
+                &format!("Page {} does not belong to any invoice (before the first detected invoice).", idx + 1),
+            ));
         }
     }
 
     let mut out = Vec::new();
     for g in gruppen {
         if g.fremd {
-            warnungen.push(format!(
-                "Seite {}–{}: Formulartyp nicht erkannt, übersprungen.",
-                g.r.start_page + 1,
-                g.r.end_page + 1
+            warnungen.push(crate::i18n::tr(
+                &format!("Seite {}–{}: Formulartyp nicht erkannt, übersprungen.", g.r.start_page + 1, g.r.end_page + 1),
+                &format!("Pages {}–{}: form type not recognized, skipped.", g.r.start_page + 1, g.r.end_page + 1),
             ));
         } else {
             out.push(g.r);
@@ -416,13 +417,13 @@ pub fn mit_kunden_abgleichen(rechnungen: &mut [Rechnung], kunden: &[Kunde]) {
                 r.kundenname = if k.kundenname.is_empty() { r.kundenname_pdf.clone() } else { k.kundenname.clone() };
                 r.email = k.email.clone();
                 if k.email.trim().is_empty() {
-                    r.warnungen.push("Keine E-Mail-Adresse hinterlegt".into());
+                    r.warnungen.push(crate::i18n::tr("Keine E-Mail-Adresse hinterlegt", "No email address on file"));
                 }
             }
             None => {
                 r.kundenname = r.kundenname_pdf.clone();
                 if !r.kundennummer.is_empty() {
-                    r.warnungen.push("Kunde nicht in der Kundenliste".into());
+                    r.warnungen.push(crate::i18n::tr("Kunde nicht in der Kundenliste", "Customer not in the customer list"));
                 }
             }
         }
@@ -436,14 +437,14 @@ pub fn analysiere_pdf(bytes: &[u8], frames: &[FrameDef], toleranz_pt: f64) -> Re
     warnungen.extend(extracted.warnings);
 
     if extracted.pages.iter().all(|p| p.glyphs.is_empty()) {
-        return Err("Die PDF enthält keinen auswertbaren Text. Eingescannte Rechnungen werden in dieser Version nicht unterstützt.".into());
+        return Err(crate::i18n::tr("Die PDF enthält keinen auswertbaren Text. Eingescannte Rechnungen werden in dieser Version nicht unterstützt.", "The PDF contains no analyzable text. Scanned invoices are not supported in this version."));
     }
 
     let proben: Vec<SeitenProbe> =
         extracted.pages.iter().enumerate().map(|(i, p)| seite_auswerten(p, &vorlage, i + 1)).collect();
     let rechnungen = gruppieren(&proben, &vorlage, &mut warnungen);
     if rechnungen.is_empty() {
-        warnungen.push("Es wurde keine Rechnung erkannt. Bitte Rahmen und Parameter prüfen.".into());
+        warnungen.push(crate::i18n::tr("Es wurde keine Rechnung erkannt. Bitte Rahmen und Parameter prüfen.", "No invoice was detected. Please check the frames and parameters."));
     }
     Ok(Analyse { seiten: proben.len(), rechnungen, proben, warnungen })
 }

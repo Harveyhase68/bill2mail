@@ -38,3 +38,8 @@ setup/Output/
 **/*.rs.bk
 *.pdb
 rustc-ice-*.txt
+
+# Lizenz: private Schluessel und ausgestellte Lizenzdateien nie einchecken
+*.key
+*.lic
+tools/*/target/

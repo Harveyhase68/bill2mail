@@ -56,9 +56,9 @@ pub fn plan(rechnungen: &[Rechnung], e: &Einstellungen) -> Vec<GeplanteMail> {
             continue;
         }
         let grund = if r.kundennummer.is_empty() {
-            "Kundennummer nicht gefunden".to_string()
+            crate::i18n::tr("Kundennummer nicht gefunden", "Customer number not found")
         } else if !r.in_liste {
-            "Kunde nicht in der Kundenliste".to_string()
+            crate::i18n::tr("Kunde nicht in der Kundenliste", "Customer not in the customer list")
         } else {
             empfaenger_pruefen(&r.email).err().unwrap_or_default()
         };
@@ -106,14 +106,14 @@ pub fn ausfuehren(
     // 1. Zerlegen
     let splitter = Splitter::laden(bytes)?;
     let ordner = splitter::ausgabeordner(quelle);
-    std::fs::create_dir_all(&ordner).map_err(|err| format!("Ordner konnte nicht angelegt werden: {err}"))?;
+    std::fs::create_dir_all(&ordner).map_err(|err| crate::i18n::tr(&format!("Ordner konnte nicht angelegt werden: {err}"), &format!("Folder could not be created: {err}")))?;
     let mut benutzt = HashSet::new();
     let mut dateien: Vec<Result<PathBuf, String>> = Vec::new();
     for r in &analyse.rechnungen {
         let pfad = ordner.join(splitter::dateiname(r, &mut benutzt));
         let ergebnis = splitter
             .teil(r.start_page, r.end_page)
-            .and_then(|mut d| d.save(&pfad).map(|_| pfad.clone()).map_err(|err| format!("PDF konnte nicht gespeichert werden: {err}")));
+            .and_then(|mut d| d.save(&pfad).map(|_| pfad.clone()).map_err(|err| crate::i18n::tr(&format!("PDF konnte nicht gespeichert werden: {err}"), &format!("PDF could not be saved: {err}"))));
         dateien.push(ergebnis);
     }
 
@@ -148,7 +148,7 @@ pub fn ausfuehren(
         if abbrechen.load(Ordering::SeqCst) {
             abgebrochen = true;
             for &nr in &m.rechnungen {
-                zeilen[zeile_von(nr)].fehler = "Abgebrochen".into();
+                zeilen[zeile_von(nr)].fehler = crate::i18n::tr("Abgebrochen", "Aborted");
             }
             continue;
         }

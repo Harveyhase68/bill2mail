@@ -52,7 +52,7 @@ const DIENST: &str = "Bill2Mail";
 const KONTO: &str = "smtp-passwort";
 
 fn eintrag() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(DIENST, KONTO).map_err(|e| format!("Passwortspeicher nicht verfügbar: {e}"))
+    keyring::Entry::new(DIENST, KONTO).map_err(|e| crate::i18n::tr(&format!("Passwortspeicher nicht verfügbar: {e}"), &format!("Password store not available: {e}")))
 }
 
 /// Das SMTP-Passwort liegt im Windows-Anmeldeinformationsspeicher, nicht in der Datenbank.
@@ -66,7 +66,7 @@ pub fn passwort_speichern(passwort: &str) -> Result<(), String> {
         let _ = e.delete_credential();
         Ok(())
     } else {
-        e.set_password(passwort).map_err(|e| format!("Passwort konnte nicht gespeichert werden: {e}"))
+        e.set_password(passwort).map_err(|e| crate::i18n::tr(&format!("Passwort konnte nicht gespeichert werden: {e}"), &format!("Password could not be saved: {e}")))
     }
 }
 

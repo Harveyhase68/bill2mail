@@ -1,3 +1,4 @@
+use crate::i18n::tr;
 use crate::settings::{Einstellungen, Sicherheit};
 use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
@@ -11,10 +12,10 @@ pub fn empfaenger_pruefen(adressen: &str) -> Result<Vec<Mailbox>, String> {
         .split(';')
         .map(str::trim)
         .filter(|a| !a.is_empty())
-        .map(|a| a.parse().map_err(|_| format!("Ungültige E-Mail-Adresse: {a}")))
+        .map(|a| a.parse().map_err(|_| tr(&format!("Ungültige E-Mail-Adresse: {a}"), &format!("Invalid email address: {a}"))))
         .collect();
     match liste {
-        Ok(l) if l.is_empty() => Err("Keine E-Mail-Adresse hinterlegt".into()),
+        Ok(l) if l.is_empty() => Err(tr("Keine E-Mail-Adresse hinterlegt", "No email address on file")),
         other => other,
     }
 }
@@ -66,13 +67,13 @@ pub struct Mailer {
 impl Mailer {
     pub fn neu(e: &Einstellungen, passwort: Option<&str>) -> Result<Self, String> {
         if e.smtp_host.trim().is_empty() {
-            return Err("Kein SMTP-Server eingetragen (Einstellungen).".into());
+            return Err(tr("Kein SMTP-Server eingetragen (Einstellungen).", "No SMTP server entered (settings)."));
         }
         let adresse: Address = e
             .absender
             .trim()
             .parse()
-            .map_err(|_| "Die Absender-Adresse in den Einstellungen ist ungültig.".to_string())?;
+            .map_err(|_| tr("Die Absender-Adresse in den Einstellungen ist ungültig.", "The sender address in the settings is invalid."))?;
         let name = (!e.absender_name.trim().is_empty()).then(|| e.absender_name.trim().to_string());
 
         let host = e.smtp_host.trim();
@@ -105,7 +106,7 @@ impl Mailer {
             .singlepart(SinglePart::builder().header(ContentType::TEXT_HTML).body(html));
         let mut teile = MultiPart::mixed().multipart(alternativ);
         for pfad in anhaenge {
-            let inhalt = std::fs::read(pfad).map_err(|e| format!("PDF konnte nicht gelesen werden ({}): {e}", pfad.display()))?;
+            let inhalt = std::fs::read(pfad).map_err(|e| tr(&format!("PDF konnte nicht gelesen werden ({}): {e}", pfad.display()), &format!("PDF could not be read ({}): {e}", pfad.display())))?;
             let dateiname = pfad.file_name().unwrap_or_default().to_string_lossy().to_string();
             teile = teile.singlepart(Attachment::new(dateiname).body(inhalt, ContentType::parse("application/pdf").unwrap()));
         }
@@ -115,19 +116,19 @@ impl Mailer {
         }
         let betreff = betreff_mit_name(&self.betreff, name);
         let betreff = if testmail { format!("TEST: {betreff}") } else { betreff };
-        b.subject(betreff).multipart(teile).map_err(|e| format!("E-Mail konnte nicht erstellt werden: {e}"))
+        b.subject(betreff).multipart(teile).map_err(|e| tr(&format!("E-Mail konnte nicht erstellt werden: {e}"), &format!("Email could not be created: {e}")))
     }
 
     /// Eine E-Mail mit allen PDFs eines Kunden.
     pub fn senden(&self, an: &str, name: &str, anhaenge: &[PathBuf]) -> Result<(), String> {
         let msg = self.nachricht(empfaenger_pruefen(an)?, name, anhaenge, false)?;
-        self.transport.send(&msg).map(|_| ()).map_err(|e| format!("Senden an {an} fehlgeschlagen: {e}"))
+        self.transport.send(&msg).map(|_| ()).map_err(|e| tr(&format!("Senden an {an} fehlgeschlagen: {e}"), &format!("Sending to {an} failed: {e}")))
     }
 
     /// Test-Mail mit dem echten Betreff/Text und Platzhalter-Name, ohne Anhang.
     pub fn test(&self, an: &str) -> Result<(), String> {
         let msg = self.nachricht(empfaenger_pruefen(an)?, "Max Mustermann", &[], true)?;
-        self.transport.send(&msg).map(|_| ()).map_err(|e| format!("Test-Mail an {an} fehlgeschlagen: {e}"))
+        self.transport.send(&msg).map(|_| ()).map_err(|e| tr(&format!("Test-Mail an {an} fehlgeschlagen: {e}"), &format!("Test email to {an} failed: {e}")))
     }
 }
 

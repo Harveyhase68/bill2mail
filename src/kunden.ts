@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t } from "./i18n";
 import type { Kunde } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -43,7 +44,7 @@ export class KundenView {
       nr.value = name.value = email.value = "";
       nr.focus();
       await this.reload();
-      this.status("Kunde angelegt.");
+      this.status(t("Kunde angelegt."));
     } catch (e) {
       this.status(String(e), true);
     }
@@ -52,7 +53,7 @@ export class KundenView {
   private async save(k: Kunde) {
     try {
       await invoke("kunde_speichern", { kunde: k });
-      this.status("Gespeichert.");
+      this.status(t("Gespeichert."));
     } catch (e) {
       this.status(String(e), true);
       await this.reload(); // fehlerhafte Eingabe zuruecksetzen
@@ -60,7 +61,7 @@ export class KundenView {
   }
 
   private async remove(k: Kunde) {
-    if (!confirm(`Kunde ${k.kundennummer} ${k.kundenname} wirklich löschen?`)) return;
+    if (!confirm(t("Kunde {nr} {name} wirklich löschen?", { nr: k.kundennummer, name: k.kundenname }))) return;
     try {
       await invoke("kunde_loeschen", { id: k.id });
       await this.reload();
@@ -74,7 +75,7 @@ export class KundenView {
     const rows = q
       ? this.kunden.filter((k) => `${k.kundennummer} ${k.kundenname} ${k.email}`.toLowerCase().includes(q))
       : this.kunden;
-    $("kunden-count").textContent = `${rows.length} von ${this.kunden.length} Kunden`;
+    $("kunden-count").textContent = t("{a} von {b} Kunden", { a: rows.length, b: this.kunden.length });
 
     this.body.replaceChildren(
       ...rows.map((k) => {
@@ -93,7 +94,7 @@ export class KundenView {
         const del = document.createElement("td");
         const btn = document.createElement("button");
         btn.className = "danger";
-        btn.textContent = "Löschen";
+        btn.textContent = t("Löschen");
         btn.addEventListener("click", () => void this.remove(k));
         del.append(btn);
         tr.append(field("kundennummer"), field("kundenname"), field("email"), del);

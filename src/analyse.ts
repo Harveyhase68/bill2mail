@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t } from "./i18n";
 import { FRAME_META, FRAME_ORDER, type Analyse, type FrameDef, type Rechnung } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -21,13 +22,13 @@ export class AnalysePanel {
 
   async run(path: string, frames: FrameDef[]) {
     this.panel.hidden = false;
-    this.title.textContent = "Analysiere …";
+    this.title.textContent = t("Analysiere …");
     this.body.replaceChildren();
     try {
       const a = await invoke<Analyse>("analysiere", { path, frames });
       this.show(a);
     } catch (e) {
-      this.title.textContent = "Analyse nicht möglich";
+      this.title.textContent = t("Analyse nicht möglich");
       const p = document.createElement("p");
       p.className = "analyse-error";
       p.textContent = String(e);
@@ -38,16 +39,18 @@ export class AnalysePanel {
   private show(a: Analyse) {
     const mit = a.rechnungen.filter((r) => r.warnungen.length > 0).length;
     this.title.textContent =
-      `${a.rechnungen.length} Rechnungen aus ${a.seiten} Seiten erkannt` + (mit ? ` – ${mit} mit Hinweisen` : "");
+      t("{n} Rechnungen aus {s} Seiten erkannt", { n: a.rechnungen.length, s: a.seiten }) + (mit ? t(" – {m} mit Hinweisen", { m: mit }) : "");
 
     const detail = document.createElement("div");
     detail.className = "analyse-detail";
-    detail.textContent = "Zeile anklicken: zeigt die gelesenen Rahmentexte der ersten Seite.";
+    detail.textContent = t("Zeile anklicken: zeigt die gelesenen Rahmentexte der ersten Seite.");
 
     const table = document.createElement("table");
     table.className = "result";
     table.innerHTML =
-      "<thead><tr><th>Nr.</th><th>Kundennr.</th><th>Kunde</th><th>Rechnungsnr.</th><th>Typ</th><th>Seiten</th><th>E-Mail</th><th>Hinweise</th></tr></thead>";
+      "<thead><tr>" +
+      ["Nr.", "Kundennr.", "Kunde", "Rechnungsnr.", "Typ", "Seiten", "E-Mail", "Hinweise"].map((h) => `<th>${t(h)}</th>`).join("") +
+      "</tr></thead>";
     const tbody = document.createElement("tbody");
     for (const r of a.rechnungen) {
       const tr = document.createElement("tr");
@@ -92,16 +95,16 @@ export class AnalysePanel {
     el.replaceChildren();
     if (!probe) return;
     const head = document.createElement("b");
-    head.textContent = `Seite ${probe.seite}: `;
+    head.textContent = t("Seite {n}: ", { n: probe.seite });
     el.append(head);
-    for (const t of FRAME_ORDER) {
-      if (probe.texte[t] === undefined) continue;
+    for (const typ of FRAME_ORDER) {
+      if (probe.texte[typ] === undefined) continue;
       const span = document.createElement("span");
       span.className = "probe";
-      span.style.setProperty("--c", FRAME_META[t].color);
-      const ok = probe.treffer[t] ? "✓" : "✗";
-      const versatz = probe.versatz[t] ? ` (${probe.versatz[t]! > 0 ? "+" : ""}${probe.versatz[t]} pt verschoben)` : "";
-      span.textContent = `${FRAME_META[t].label} ${ok} „${probe.texte[t]!.replaceAll("\n", " ⏎ ")}“${versatz}`;
+      span.style.setProperty("--c", FRAME_META[typ].color);
+      const ok = probe.treffer[typ] ? "✓" : "✗";
+      const versatz = probe.versatz[typ] ? t(" ({v} pt verschoben)", { v: `${probe.versatz[typ]! > 0 ? "+" : ""}${probe.versatz[typ]}` }) : "";
+      span.textContent = `${t(FRAME_META[typ].label)} ${ok} „${probe.texte[typ]!.replaceAll("\n", " ⏎ ")}“${versatz}`;
       el.append(span);
     }
   }

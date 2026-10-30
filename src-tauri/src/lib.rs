@@ -1,4 +1,6 @@
 mod db;
+mod i18n;
+mod lizenz;
 mod mail;
 mod parser;
 mod pdf_text;
@@ -9,6 +11,7 @@ mod ueberwachung;
 mod versand;
 
 use db::{Database, Kunde};
+use i18n::tr;
 use parser::{Analyse, FrameDef};
 use serde::Serialize;
 use settings::Einstellungen;
@@ -24,6 +27,7 @@ struct AppState {
     abbrechen: Arc<AtomicBool>,
     ueberwachung: Mutex<Option<ueberwachung::Ueberwachung>>,
     ueberwachung_status: Mutex<UeberwachungsStatus>,
+    datenordner: std::path::PathBuf,
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -56,12 +60,14 @@ fn ueberwachung_anwenden(app: &AppHandle, e: &Einstellungen) -> UeberwachungsSta
 
     let status = if !e.ueberwachung_aktiv {
         UeberwachungsStatus::default()
+    } else if let Err(grund) = lizenz::laden(&state.datenordner) {
+        UeberwachungsStatus { aktiv: false, meldung: format!("{grund} {}", lizenz::erforderlich()) }
     } else {
         let ordner = std::path::PathBuf::from(e.ueberwachung_ordner.trim());
         if e.ueberwachung_ordner.trim().is_empty() {
-            UeberwachungsStatus { aktiv: false, meldung: "Kein Ordner gewählt – die Überwachung ist aus.".into() }
+            UeberwachungsStatus { aktiv: false, meldung: tr("Kein Ordner gewählt – die Überwachung ist aus.", "No folder selected – monitoring is off.") }
         } else if !ordner.is_dir() {
-            UeberwachungsStatus { aktiv: false, meldung: format!("Ordner nicht gefunden: {}", ordner.display()) }
+            UeberwachungsStatus { aktiv: false, meldung: tr(&format!("Ordner nicht gefunden: {}", ordner.display()), &format!("Folder not found: {}", ordner.display())) }
         } else {
             let app2 = app.clone();
             let gestartet = ueberwachung::starten(&ordner, ueberwachung::Zeiten::default(), move |m| {
@@ -75,7 +81,7 @@ fn ueberwachung_anwenden(app: &AppHandle, e: &Einstellungen) -> UeberwachungsSta
             match gestartet {
                 Ok(u) => {
                     *slot = Some(u);
-                    UeberwachungsStatus { aktiv: true, meldung: format!("Überwache {}", ordner.display()) }
+                    UeberwachungsStatus { aktiv: true, meldung: tr(&format!("Überwache {}", ordner.display()), &format!("Monitoring {}", ordner.display())) }
                 }
                 Err(f) => UeberwachungsStatus { aktiv: false, meldung: f },
             }
@@ -94,7 +100,7 @@ fn fehler<E: std::fmt::Display>(e: E) -> String {
 fn pdf_lesen(path: String) -> Result<Response, String> {
     std::fs::read(&path)
         .map(Response::new)
-        .map_err(|e| format!("PDF konnte nicht gelesen werden: {e}"))
+        .map_err(|e| tr(&format!("PDF konnte nicht gelesen werden: {e}"), &format!("PDF could not be read: {e}")))
 }
 
 fn pdf_analysieren(bytes: &[u8], frames: &[FrameDef], kunden: &[Kunde], toleranz_pt: f64) -> Result<Analyse, String> {
@@ -164,7 +170,7 @@ async fn test_mail_senden(state: State<'_, AppState>) -> Result<String, String> 
     let e = state.db.lock().unwrap().einstellungen_laden().map_err(fehler)?;
     let empfaenger = e.test_empfaenger.trim().to_string();
     if empfaenger.is_empty() {
-        return Err("Bitte zuerst eine Test-Empfängeradresse in den Einstellungen eintragen.".into());
+        return Err(tr("Bitte zuerst eine Test-Empfängeradresse in den Einstellungen eintragen.", "Please enter a test recipient address in the settings first."));
     }
     tauri::async_runtime::spawn_blocking(move || {
         let m = mail::Mailer::neu(&e, settings::passwort_lesen().as_deref())?;
@@ -224,7 +230,7 @@ async fn versand_vorschau(state: State<'_, AppState>, path: String, frames: Vec<
         .unwrap()
         .versand_gefunden(&hash)
         .map_err(fehler)?
-        .map(|(pfad, zeit)| format!("Dieses PDF wurde bereits am {zeit} versendet (Datei: {pfad})."));
+        .map(|(pfad, zeit)| tr(&format!("Dieses PDF wurde bereits am {zeit} versendet (Datei: {pfad})."), &format!("This PDF was already sent on {zeit} (file: {pfad}).")));
     Ok(vorschau)
 }
 
@@ -244,6 +250,7 @@ async fn versenden(
     path: String,
     frames: Vec<FrameDef>,
 ) -> Result<Ergebnis, String> {
+    lizenz::laden(&state.datenordner).map_err(|grund| format!("{grund} {}", lizenz::erforderlich()))?;
     let (kunden, e) = {
         let db = state.db.lock().unwrap();
         (db.alle_kunden().map_err(fehler)?, db.einstellungen_laden().map_err(fehler)?)
@@ -285,11 +292,11 @@ fn kunden_laden(state: State<AppState>) -> Result<Vec<Kunde>, String> {
 #[tauri::command]
 fn kunde_speichern(state: State<AppState>, kunde: Kunde) -> Result<i64, String> {
     if kunde.kundennummer.trim().is_empty() {
-        return Err("Die Kundennummer darf nicht leer sein.".into());
+        return Err(tr("Die Kundennummer darf nicht leer sein.", "The customer number must not be empty."));
     }
     state.db.lock().unwrap().kunde_speichern(&kunde).map_err(|e| match e {
         rusqlite::Error::SqliteFailure(f, _) if f.code == rusqlite::ErrorCode::ConstraintViolation => {
-            format!("Die Kundennummer {} existiert bereits.", kunde.kundennummer.trim())
+            tr(&format!("Die Kundennummer {} existiert bereits.", kunde.kundennummer.trim()), &format!("Customer number {} already exists.", kunde.kundennummer.trim()))
         }
         other => other.to_string(),
     })
@@ -325,6 +332,7 @@ pub fn run() {
                 abbrechen: Arc::new(AtomicBool::new(false)),
                 ueberwachung: Mutex::new(None),
                 ueberwachung_status: Mutex::new(UeberwachungsStatus::default()),
+                datenordner: dir.clone(),
             });
             ueberwachung_anwenden(app.handle(), &einstellungen);
             Ok(())
@@ -343,7 +351,39 @@ pub fn run() {
             kunde_loeschen,
             vorlage_laden,
             vorlage_speichern,
+            lizenz_status,
+            lizenz_installieren,
+            sprache_system,
+            sprache_setzen,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten von Bill2Mail");
+}
+
+// ------------------------------------------------------- Lizenz und Sprache
+
+#[tauri::command]
+fn lizenz_status(state: State<AppState>) -> lizenz::LizenzStatus {
+    lizenz::status(&state.datenordner)
+}
+
+/// Prueft die gewaehlte Lizenzdatei, installiert sie und startet ggf. die Ueberwachung.
+#[tauri::command]
+fn lizenz_installieren(app: AppHandle, state: State<AppState>, pfad: String) -> Result<lizenz::LizenzStatus, String> {
+    lizenz::installieren(std::path::Path::new(&pfad), &state.datenordner)?;
+    let e = state.db.lock().unwrap().einstellungen_laden().map_err(fehler)?;
+    ueberwachung_anwenden(&app, &e);
+    Ok(lizenz::status(&state.datenordner))
+}
+
+/// Windows-Anzeigesprache, z. B. "de-AT"
+#[tauri::command]
+fn sprache_system() -> String {
+    i18n::systemsprache()
+}
+
+/// Sprache der Backend-Texte (Fehlermeldungen, Protokoll)
+#[tauri::command]
+fn sprache_setzen(englisch: bool) {
+    i18n::setzen(englisch);
 }

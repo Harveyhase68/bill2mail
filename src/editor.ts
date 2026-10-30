@@ -3,6 +3,7 @@ import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { FRAME_META, FRAME_ORDER, type FrameDef, type FrameType } from "./types";
+import { t } from "./i18n";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -150,7 +151,7 @@ export class Editor {
     }
     this.onWarning(
       chars === 0
-        ? "Dieses PDF enthält keinen auswertbaren Text. Vermutlich handelt es sich um eingescannte Rechnungen. Diese werden in dieser Version nicht unterstützt (OCR folgt später)."
+        ? t("Dieses PDF enthält keinen auswertbaren Text. Vermutlich handelt es sich um eingescannte Rechnungen. Diese werden in dieser Version nicht unterstützt (OCR folgt später).")
         : null,
     );
   }
@@ -273,7 +274,7 @@ export class Editor {
     el.style.setProperty("--c", meta.color);
     const tag = document.createElement("span");
     tag.className = "frame-tag";
-    tag.textContent = meta.label;
+    tag.textContent = t(meta.label);
     el.append(tag);
     for (const h of HANDLES) {
       const hd = document.createElement("span");
@@ -431,12 +432,12 @@ export class Editor {
       btn.style.setProperty("--c", meta.color);
       const params = f?.params.trim();
       btn.innerHTML = `<span class="swatch"></span><span class="tool-text"><b></b><small></small></span>`;
-      btn.querySelector("b")!.textContent = meta.label + (meta.optional ? " (optional)" : "");
+      btn.querySelector("b")!.textContent = t(meta.label) + (meta.optional ? " " + t("(optional)") : "");
       btn.querySelector("small")!.textContent = f
-        ? params || "Parameter fehlt – Doppelklick auf den Rahmen"
+        ? params || t("Parameter fehlt – Doppelklick auf den Rahmen")
         : this.armed === type
-          ? "Rahmen auf der Seite aufziehen …"
-          : "Nicht gesetzt";
+          ? t("Rahmen auf der Seite aufziehen …")
+          : t("Nicht gesetzt");
       btn.addEventListener("click", () => {
         if (this.pages.length === 0) return;
         if (f) {
@@ -465,9 +466,9 @@ export class Editor {
     this.dlgType = type;
     this.dlgIsNew = isNew;
     this.dlg.style.setProperty("--c", meta.color);
-    $("dlg-title").textContent = `${meta.label}${meta.optional ? " (optional)" : ""}`;
-    $("dlg-hint").textContent = meta.hint;
-    this.dlgText.placeholder = meta.placeholder;
+    $("dlg-title").textContent = `${t(meta.label)}${meta.optional ? " " + t("(optional)") : ""}`;
+    $("dlg-hint").textContent = t(meta.hint);
+    this.dlgText.placeholder = t(meta.placeholder);
     this.dlgText.value = f.params;
     this.dlg.hidden = false;
 

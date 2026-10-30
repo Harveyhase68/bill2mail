@@ -1,0 +1,15 @@
+[package]
+name = "lizenz-tool"
+version = "0.1.0"
+edition = "2021"
+description = "Bill2Mail: Lizenz-Schluessel erzeugen und Lizenzdateien ausstellen (nur fuer den Hersteller, nie ausliefern)"
+
+# eigener Workspace, damit das Tool nicht zum Tauri-Projekt gehoert
+[workspace]
+
+[dependencies]
+ed25519-dalek = "2"
+base64 = "0.22"
+serde_json = "1"
+getrandom = "0.3"
+chrono = "0.4"

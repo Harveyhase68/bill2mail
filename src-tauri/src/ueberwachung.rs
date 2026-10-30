@@ -69,10 +69,10 @@ pub fn starten(
             let _ = tx.send(ev);
         }
     })
-    .map_err(|e| format!("Ordnerüberwachung konnte nicht gestartet werden: {e}"))?;
+    .map_err(|e| crate::i18n::tr(&format!("Ordnerüberwachung konnte nicht gestartet werden: {e}"), &format!("Folder monitoring could not be started: {e}")))?;
     watcher
         .watch(ordner, RecursiveMode::NonRecursive)
-        .map_err(|e| format!("Ordner kann nicht überwacht werden: {e}"))?;
+        .map_err(|e| crate::i18n::tr(&format!("Ordner kann nicht überwacht werden: {e}"), &format!("The folder cannot be monitored: {e}")))?;
 
     std::thread::spawn(move || {
         let mut offen: HashMap<PathBuf, Kandidat> = HashMap::new();
@@ -125,8 +125,12 @@ pub fn starten(
                     let neu = erledigt.insert(key);
                     fertig.push((pfad.clone(), neu.then_some(Meldung::Bereit(pfad.clone()))));
                 } else if jetzt.duration_since(k.erstmals) > zeiten.max_warten {
-                    let grund = if frei { "Die Datei hat sich nicht stabilisiert." } else { "Die Datei blieb gesperrt (von einem anderen Programm geöffnet)." };
-                    fertig.push((pfad.clone(), Some(Meldung::Fehler(pfad.clone(), grund.into()))));
+                    let grund = if frei {
+                        crate::i18n::tr("Die Datei hat sich nicht stabilisiert.", "The file did not stabilize.")
+                    } else {
+                        crate::i18n::tr("Die Datei blieb gesperrt (von einem anderen Programm geöffnet).", "The file stayed locked (opened by another program).")
+                    };
+                    fertig.push((pfad.clone(), Some(Meldung::Fehler(pfad.clone(), grund))));
                 }
             }
             for (pfad, meldung) in fertig {

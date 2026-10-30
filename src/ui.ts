@@ -1,4 +1,5 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { t } from "./i18n";
 import type { ProtokollZeile, VersandErgebnis, Vorschau } from "./types";
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
@@ -45,7 +46,7 @@ function zeilenRow(z: ProtokollZeile): HTMLTableRowElement {
       z.rechnungsnummer,
       z.seiten,
       z.email.replaceAll(";", "; "),
-      el("span", `chip ${cls}`, STATUS_TEXT[z.status]),
+      el("span", `chip ${cls}`, t(STATUS_TEXT[z.status])),
       z.fehler,
     ],
     z.status === "fehler" ? "warn" : "",
@@ -58,14 +59,14 @@ export function vorschauTeile(v: Vorschau, mitMailText: boolean): HTMLElement[] 
   const skip = v.mails.length - senden.length;
   const parts: HTMLElement[] = [];
 
-  if (v.bereits_gesendet) parts.push(el("div", "banner bad", `⚠ ${v.bereits_gesendet} Nochmal senden erzeugt doppelte E-Mails.`));
+  if (v.bereits_gesendet) parts.push(el("div", "banner bad", t("⚠ {m} Nochmal senden erzeugt doppelte E-Mails.", { m: v.bereits_gesendet })));
 
   parts.push(
     el(
       "p",
       "v-summary",
-      `${v.analyse.rechnungen.length} Rechnungen aus ${v.analyse.seiten} Seiten · ${senden.length} E-Mails werden gesendet` +
-        (skip ? ` · ${skip} Kunden werden übersprungen` : ""),
+      t("{r} Rechnungen aus {s} Seiten · {n} E-Mails werden gesendet", { r: v.analyse.rechnungen.length, s: v.analyse.seiten, n: senden.length }) +
+        (skip ? t(" · {k} Kunden werden übersprungen", { k: skip }) : ""),
     ),
   );
 
@@ -75,13 +76,13 @@ export function vorschauTeile(v: Vorschau, mitMailText: boolean): HTMLElement[] 
     parts.push(ul);
   }
 
-  const { table: t, body } = table(["", "Kundennr.", "Kunde", "E-Mail", "Rechnungen", "Seiten", "Grund"]);
+  const { table: tab, body } = table(["", "Kundennr.", "Kunde", "E-Mail", "Rechnungen", "Seiten", "Grund"].map((h) => t(h)));
   for (const m of v.mails) {
     const nrs = v.analyse.rechnungen.filter((r) => m.rechnungen.includes(r.nr)).map((r) => r.rechnungsnummer || `#${r.nr}`);
     body.append(
       row(
         [
-          el("span", m.senden ? "chip ok" : "chip skip", m.senden ? "senden" : "überspringen"),
+          el("span", m.senden ? "chip ok" : "chip skip", t(m.senden ? "senden" : "überspringen")),
           m.kundennummer,
           m.kundenname,
           m.email.replaceAll(";", "; "),
@@ -93,12 +94,12 @@ export function vorschauTeile(v: Vorschau, mitMailText: boolean): HTMLElement[] 
       ),
     );
   }
-  parts.push(t);
+  parts.push(tab);
 
   if (mitMailText) {
     const mail = el("details", "v-mail");
-    mail.append(el("summary", "", `So sieht die E-Mail aus – Betreff: ${v.betreff}`));
-    mail.append(el("div", "hint", `Von: ${v.absender || "(kein Absender eingetragen)"}`));
+    mail.append(el("summary", "", t("So sieht die E-Mail aus – Betreff: {b}", { b: v.betreff })));
+    mail.append(el("div", "hint", t("Von: {a}", { a: v.absender || t("(kein Absender eingetragen)") })));
     const frame = el("iframe", "mail-frame");
     frame.setAttribute("sandbox", ""); // kein Skript, keine Navigation
     frame.srcdoc = `<body style="font:14px Segoe UI,sans-serif">${v.text_html}</body>`;
@@ -114,22 +115,22 @@ export function ergebnisTeile(e: VersandErgebnis): HTMLElement[] {
     el(
       "p",
       "v-summary" + (e.mails_fehler > 0 ? " bad" : ""),
-      `${e.mails_gesendet} E-Mails gesendet` +
-        (e.mails_fehler ? ` · ${e.mails_fehler} mit Fehler` : "") +
-        (e.rechnungen_uebersprungen ? ` · ${e.rechnungen_uebersprungen} Rechnungen übersprungen` : "") +
-        (e.abgebrochen ? " · abgebrochen" : ""),
+      t("{n} E-Mails gesendet", { n: e.mails_gesendet }) +
+        (e.mails_fehler ? t(" · {n} mit Fehler", { n: e.mails_fehler }) : "") +
+        (e.rechnungen_uebersprungen ? t(" · {n} Rechnungen übersprungen", { n: e.rechnungen_uebersprungen }) : "") +
+        (e.abgebrochen ? t(" · abgebrochen") : ""),
     ),
   );
   const links = el("div", "v-links");
-  const xlsx = el("button", "", "Protokoll (XLSX) im Explorer zeigen");
+  const xlsx = el("button", "", t("Protokoll (XLSX) im Explorer zeigen"));
   xlsx.addEventListener("click", () => void revealItemInDir(e.protokoll));
-  const ordner = el("button", "", "Ordner mit den Einzel-PDFs zeigen");
+  const ordner = el("button", "", t("Ordner mit den Einzel-PDFs zeigen"));
   ordner.addEventListener("click", () => void revealItemInDir(e.ordner));
   links.append(xlsx, ordner);
   parts.push(links);
 
-  const { table: t, body } = table(["Nr.", "Kundennr.", "Kunde", "Rechnungsnr.", "Seiten", "E-Mail", "Status", "Hinweis"]);
+  const { table: tab, body } = table(["Nr.", "Kundennr.", "Kunde", "Rechnungsnr.", "Seiten", "E-Mail", "Status", "Hinweis"].map((h) => t(h)));
   for (const z of e.zeilen) body.append(zeilenRow(z));
-  parts.push(t);
+  parts.push(tab);
   return parts;
 }

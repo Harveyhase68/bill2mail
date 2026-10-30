@@ -125,9 +125,9 @@ fn rotate_point(rotate: i64, w: f64, h: f64, x: f64, y: f64) -> (f64, f64) {
 }
 
 pub fn extract_pages(bytes: &[u8]) -> Result<Extracted, String> {
-    let doc = Document::load_mem(bytes).map_err(|e| format!("Fehler beim Lesen der PDF: {e}"))?;
+    let doc = Document::load_mem(bytes).map_err(|e| crate::i18n::tr(&format!("Fehler beim Lesen der PDF: {e}"), &format!("Error reading the PDF: {e}")))?;
     if doc.is_encrypted() {
-        return Err("Die PDF ist passwortgeschützt und kann nicht ausgewertet werden.".into());
+        return Err(crate::i18n::tr("Die PDF ist passwortgeschützt und kann nicht ausgewertet werden.", "The PDF is password-protected and cannot be analyzed."));
     }
     let mut pages = Vec::new();
     let mut warnings = Vec::new();
@@ -140,12 +140,12 @@ pub fn extract_pages(bytes: &[u8]) -> Result<Extracted, String> {
         let result = catch_unwind(AssertUnwindSafe(|| pdf_extract::output_doc_page(&doc, &mut c, num)));
         match result {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => warnings.push(format!("Seite {num}: Text konnte nicht gelesen werden ({e:?}).")),
-            Err(_) => warnings.push(format!("Seite {num}: Text konnte nicht gelesen werden (interner Fehler).")),
+            Ok(Err(e)) => warnings.push(crate::i18n::tr(&format!("Seite {num}: Text konnte nicht gelesen werden ({e:?})."), &format!("Page {num}: text could not be read ({e:?})."))),
+            Err(_) => warnings.push(crate::i18n::tr(&format!("Seite {num}: Text konnte nicht gelesen werden (interner Fehler)."), &format!("Page {num}: text could not be read (internal error)."))),
         }
 
         if b.rotate != 0 {
-            warnings.push(format!("Seite {num} ist gedreht ({}°), die Texterkennung ist dort eingeschränkt.", b.rotate));
+            warnings.push(crate::i18n::tr(&format!("Seite {num} ist gedreht ({}°), die Texterkennung ist dort eingeschränkt.", b.rotate), &format!("Page {num} is rotated ({}°); text recognition is limited there.", b.rotate)));
             for g in &mut c.glyphs {
                 (g.cx, g.cy) = rotate_point(b.rotate, w, h, g.cx, g.cy);
             }
