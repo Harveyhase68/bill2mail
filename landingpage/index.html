@@ -1,25 +1,363 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDFCourier – Der Rechnungs-Kurier</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 50px; background: #f4f7f6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        h1 { color: #2c3e50; }
-        p { color: #666; line-height: 1.6; }
-        .btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
-        .btn:hover { background: #0056b3; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bill2Mail – Sammel-PDFs zerlegen und Rechnungen per E-Mail versenden</title>
+<meta name="description" content="Bill2Mail liest Sammel-PDFs mit Rechnungen ein, schneidet sie pro Kunde auseinander und versendet sie per E-Mail. Lokal auf Ihrem Windows-PC, ohne Cloud.">
+<meta name="color-scheme" content="light dark">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --text: #1b2230;
+    --muted: #5b6678;
+    --line: #dde2ea;
+    --accent: #1d4f91;
+    --accent-2: #2f6fc4;
+    --accent-text: #ffffff;
+    --soft: #e8f0fb;
+    --paper: #ffffff;
+    --bar: #d3d9e2;
+    --shadow: 0 18px 50px rgba(20, 40, 80, .14);
+    --red: #8b1a1a; --blue: #1a3a8b; --green: #1a6b2a; --violet: #5b1a8b; --gray: #555;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c;
+      --panel: #1b2029;
+      --text: #e8ebf1;
+      --muted: #9aa5b8;
+      --line: #2e3542;
+      --accent: #6fa3e8;
+      --accent-2: #8bb8f2;
+      --accent-text: #0e1522;
+      --soft: #1f2a3b;
+      --paper: #f3f4f6;
+      --bar: #c4cad4;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .5);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  /* Sprache */
+  html.en .de { display: none !important; }
+  html:not(.en) .en { display: none !important; }
+
+  /* Kopf */
+  header.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  header.top .wrap { display: flex; align-items: center; gap: 18px; height: 60px; }
+  .logo { font-weight: 700; font-size: 20px; letter-spacing: -.01em; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 9px; }
+  .logo i { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--accent-2), var(--accent)); display: grid; place-items: center; }
+  .logo i::after { content: ""; width: 12px; height: 8px; border: 2px solid var(--accent-text); border-radius: 2px; }
+  nav.links { margin-left: auto; display: flex; gap: 20px; font-size: 14.5px; }
+  nav.links a { color: var(--muted); text-decoration: none; }
+  nav.links a:hover { color: var(--text); }
+  .lang { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+  .lang:hover { border-color: var(--accent); }
+  @media (max-width: 720px) { nav.links a:not(.keep) { display: none; } }
+
+  /* Hero */
+  .hero { padding: 72px 0 40px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 880px) { .hero .wrap { grid-template-columns: 1fr; } .hero { padding-top: 44px; } }
+  .eyebrow { display: inline-block; font-size: 13px; font-weight: 600; color: var(--accent); background: var(--soft); padding: 4px 12px; border-radius: 999px; margin-bottom: 18px; }
+  h1 { font-size: clamp(32px, 5vw, 50px); line-height: 1.1; letter-spacing: -.025em; margin: 0 0 18px; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .lead { font-size: 18.5px; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-block; padding: 13px 24px; border-radius: 10px; font-weight: 600; text-decoration: none; font-size: 16px; border: 1px solid transparent; transition: transform .12s, box-shadow .12s; }
+  .btn.primary { background: var(--accent); color: var(--accent-text); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .btn.primary:hover { transform: translateY(-1px); }
+  .btn.ghost { border-color: var(--line); background: var(--panel); color: var(--text); }
+  .btn.ghost:hover { border-color: var(--accent); }
+  .fine { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+
+  /* Illustration: Rechnung mit Rahmen */
+  .stage { position: relative; }
+  .paper { position: relative; background: var(--paper); border-radius: 10px; box-shadow: var(--shadow); aspect-ratio: 210 / 250; padding: 6% 7%; overflow: hidden; border: 1px solid var(--line); }
+  .paper .bar { height: 7px; border-radius: 4px; background: var(--bar); margin-bottom: 8px; }
+  .paper .bar.s { width: 38%; } .paper .bar.m { width: 62%; } .paper .bar.l { width: 88%; }
+  .paper .title { height: 14px; width: 42%; background: #9aa3b2; border-radius: 4px; position: absolute; left: 9%; top: 31%; }
+  .paper .rows { position: absolute; left: 7%; right: 7%; top: 47%; }
+  .paper .rows .bar { height: 6px; }
+  .fr { position: absolute; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); border-radius: 3px; }
+  .fr b { position: absolute; left: -2px; top: -22px; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 4px 4px 4px 0; background: var(--c); color: #fff; white-space: nowrap; }
+  .fr.f-blau { --c: var(--blue); left: 7%; top: 13%; width: 40%; height: 5.5%; }
+  .fr.f-grau { --c: var(--gray); left: 53%; top: 13%; width: 40%; height: 5.5%; }
+  .fr.f-violett { --c: var(--violet); right: 7%; top: 28%; width: 24%; height: 5.5%; }
+  .fr.f-rot { --c: var(--red); left: 7%; top: 28%; width: 57%; height: 9%; }
+  .fr.f-rot b { top: auto; bottom: -22px; border-radius: 0 4px 4px 4px; }
+  .badge { position: absolute; right: -10px; bottom: 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 11px 15px; font-size: 13.5px; display: flex; align-items: center; gap: 10px; }
+  .badge::before { content: "✓"; width: 24px; height: 24px; border-radius: 50%; background: #1a7f3c; color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+  @media (max-width: 880px) { .badge { right: 6px; } }
+
+  /* Sektionen */
+  section { padding: 64px 0; }
+  section.alt { background: var(--panel); border-block: 1px solid var(--line); }
+  h2 { font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -.02em; margin: 0 0 10px; line-height: 1.2; }
+  .sub { color: var(--muted); font-size: 17px; margin: 0 0 40px; max-width: 40em; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; counter-reset: s; }
+  @media (max-width: 820px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; counter-increment: s; }
+  section.alt .step { background: var(--bg); }
+  .step::before { content: counter(s); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--soft); color: var(--accent); font-weight: 700; margin-bottom: 14px; }
+  .step h3 { margin: 0 0 6px; font-size: 18px; }
+  .step p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .legend span { font-size: 13.5px; padding: 5px 12px 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); display: inline-flex; align-items: center; gap: 8px; }
+  .legend span::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 580px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .card .ic { width: 38px; height: 38px; border-radius: 10px; background: var(--soft); color: var(--accent); display: grid; place-items: center; font-size: 19px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+  .plan { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
+  .plan.pro { border-color: var(--accent); box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 16%, transparent); }
+  .plan h3 { margin: 0 0 4px; font-size: 21px; }
+  .plan .tag { color: var(--muted); font-size: 14.5px; margin-bottom: 16px; }
+  .plan ul { list-style: none; padding: 0; margin: 0 0 22px; }
+  .plan li { padding: 6px 0 6px 28px; position: relative; font-size: 15.5px; }
+  .plan li::before { content: "✓"; position: absolute; left: 0; color: #1a7f3c; font-weight: 700; }
+  .plan li.no { color: var(--muted); }
+  .plan li.no::before { content: "–"; color: var(--muted); }
+
+  .faq details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px; margin-bottom: 10px; }
+  .faq summary { cursor: pointer; font-weight: 600; padding: 13px 0; list-style-position: outside; }
+  .faq p { margin: 0 0 14px; color: var(--muted); font-size: 15.5px; }
+
+  .final { text-align: center; padding: 70px 0; }
+  .final .cta { justify-content: center; }
+  .final .sub { margin-inline: auto; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>PDFCourier</h1>
-        <p>Das einfache, lokale Offline-Tool für Windows: Sammel-Rechnungen als PDF einlesen, automatisch pro Kunde zerschneiden und per E-Mail versenden. 100% DSGVO-konform.</p>
-        
-        <!-- Hier verlinkst du später deine InnoSetup .exe oder deinen GitHub Release -->
-        <a href="URL_ZUR_DEINER_EXE_ODER_GITHUB_RELEASE" class="btn">PDFCourier für Windows herunterladen</a>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#"><i></i>Bill2Mail</a>
+    <nav class="links">
+      <a href="#ablauf"><span class="de">So funktioniert's</span><span class="en">How it works</span></a>
+      <a href="#funktionen"><span class="de">Funktionen</span><span class="en">Features</span></a>
+      <a href="#lizenz"><span class="de">Demo &amp; Lizenz</span><span class="en">Demo &amp; license</span></a>
+      <a href="#faq" class="keep">FAQ</a>
+    </nav>
+    <button class="lang" id="lang" type="button" aria-label="Sprache wechseln / Switch language">DE | EN</button>
+  </div>
+</header>
+
+<main>
+<!-- Hero -->
+<div class="hero">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow"><span class="de">Für Windows · läuft lokal auf Ihrem PC</span><span class="en">For Windows · runs locally on your PC</span></span>
+      <h1>
+        <span class="de">Sammel-Rechnungen zerlegen. <em>Per E-Mail versenden.</em> Fertig.</span>
+        <span class="en">Split batch invoices. <em>Email them.</em> Done.</span>
+      </h1>
+      <p class="lead">
+        <span class="de">Bill2Mail liest Ihre Sammel-PDF mit Rechnungen ein, erkennt jede Rechnung anhand von Kunden- und Rechnungsnummer, schneidet sie auseinander und schickt sie an den richtigen Kunden. Die Vorlage legen Sie einmal mit der Maus fest.</span>
+        <span class="en">Bill2Mail reads your batch PDF of invoices, recognizes each invoice by customer and invoice number, cuts them apart and sends each to the right customer. You set up the template once with your mouse.</span>
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/Harveyhase68/bill2mail/releases/latest"><span class="de">Demo für Windows herunterladen</span><span class="en">Download demo for Windows</span></a>
+        <a class="btn ghost" href="https://www.predl.cc"><span class="de">Lizenz anfragen</span><span class="en">Request a license</span></a>
+      </div>
+      <p class="fine"><span class="de">Windows 10/11 · Demo ohne Anmeldung · Versand erst mit Lizenz</span><span class="en">Windows 10/11 · demo without sign-up · sending requires a license</span></p>
     </div>
+
+    <div class="stage" aria-hidden="true">
+      <div class="paper">
+        <div class="bar s"></div><div class="bar m"></div>
+        <div class="title"></div>
+        <div class="rows">
+          <div class="bar l"></div><div class="bar l"></div><div class="bar m"></div><div class="bar l"></div><div class="bar s"></div><div class="bar l"></div><div class="bar m"></div>
+        </div>
+        <div class="fr f-blau"><b><span class="de">Kundennummer</span><span class="en">Customer no.</span></b></div>
+        <div class="fr f-grau"><b><span class="de">Kundenname</span><span class="en">Customer name</span></b></div>
+        <div class="fr f-rot"><b><span class="de">Formulartyp · Rechnungsnr.</span><span class="en">Form type · invoice no.</span></b></div>
+        <div class="fr f-violett"><b><span class="de">Seite</span><span class="en">Page</span></b></div>
+      </div>
+      <div class="badge"><span class="de">Rechnungen erkannt</span><span class="en">Invoices detected</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Ablauf -->
+<section id="ablauf">
+  <div class="wrap">
+    <h2><span class="de">In drei Schritten zum Versand</span><span class="en">Three steps to sending</span></h2>
+    <p class="sub"><span class="de">Kein Skript, keine Programmierung: Sie zeigen dem Programm einmal, wo auf Ihrer Rechnung die Nummern stehen.</span><span class="en">No scripts, no programming: you show the program once where the numbers are on your invoice.</span></p>
+    <div class="steps">
+      <div class="step">
+        <h3><span class="de">Rahmen ziehen</span><span class="en">Draw frames</span></h3>
+        <p><span class="de">PDF öffnen und mit der Maus Rahmen um Formulartyp, Kundennummer und Rechnungsnummer ziehen. Rahmen lassen sich jederzeit verschieben und in der Größe ändern.</span><span class="en">Open a PDF and drag frames around the form type, customer number and invoice number. Frames can be moved and resized at any time.</span></p>
+      </div>
+      <div class="step">
+        <h3><span class="de">Prüfen</span><span class="en">Check</span></h3>
+        <p><span class="de">Die Vorschau zeigt, welche Rechnung an welchen Kunden geht. Eine Test-Mail an Ihre eigene Adresse zeigt, wie die E-Mail beim Kunden aussieht.</span><span class="en">The preview shows which invoice goes to which customer. A test email to your own address shows how the email will look.</span></p>
+      </div>
+      <div class="step">
+        <h3><span class="de">Versenden</span><span class="en">Send</span></h3>
+        <p><span class="de">Ein Klick, und jeder Kunde bekommt seine Rechnung. Sie erhalten ein Excel-Protokoll und einen Ordner mit allen Einzel-PDFs.</span><span class="en">One click, and every customer gets their invoice. You get an Excel log and a folder with all individual PDFs.</span></p>
+      </div>
+    </div>
+    <div class="legend" style="margin-top:30px">
+      <span style="--c:var(--red)"><span class="de">Formulartyp</span><span class="en">Form type</span></span>
+      <span style="--c:var(--blue)"><span class="de">Kundennummer</span><span class="en">Customer number</span></span>
+      <span style="--c:var(--green)"><span class="de">Rechnungsnummer</span><span class="en">Invoice number</span></span>
+      <span style="--c:var(--violet)"><span class="de">Seitennummer (optional)</span><span class="en">Page number (optional)</span></span>
+      <span style="--c:var(--gray)"><span class="de">Kundenname (optional)</span><span class="en">Customer name (optional)</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- Funktionen -->
+<section id="funktionen" class="alt">
+  <div class="wrap">
+    <h2><span class="de">Gebaut für den Büroalltag</span><span class="en">Built for everyday office work</span></h2>
+    <p class="sub"><span class="de">Alles, was zwischen „Rechnungslauf fertig“ und „Kunde hat die Rechnung“ liegt.</span><span class="en">Everything between “invoice run finished” and “customer has the invoice”.</span></p>
+    <div class="grid">
+      <div class="card"><div class="ic">▭</div><h3><span class="de">Visuelle Vorlage</span><span class="en">Visual template</span></h3><p><span class="de">PDF-Ansicht mit Zoom und Seitenblättern. Die Vorlage wird gespeichert und gilt für alle Seiten.</span><span class="en">PDF viewer with zoom and paging. The template is saved and applies to all pages.</span></p></div>
+      <div class="card"><div class="ic">✉</div><h3><span class="de">Eine Mail pro Kunde</span><span class="en">One email per customer</span></h3><p><span class="de">Mehrere Rechnungen eines Kunden gehen gebündelt in einer E-Mail raus, auch an mehrere Adressen.</span><span class="en">Several invoices for one customer are bundled into a single email, also to several addresses.</span></p></div>
+      <div class="card"><div class="ic">⟳</div><h3><span class="de">Ordner-Überwachung</span><span class="en">Folder monitoring</span></h3><p><span class="de">Neue PDF im Eingangsordner? Bill2Mail wartet, bis sie fertig geschrieben ist, und zeigt Ihnen die erkannten Rechnungen zur Freigabe.</span><span class="en">New PDF in your inbox folder? Bill2Mail waits until it is completely written and shows you the detected invoices for approval.</span></p></div>
+      <div class="card"><div class="ic">▤</div><h3><span class="de">Protokoll &amp; Einzel-PDFs</span><span class="en">Log &amp; individual PDFs</span></h3><p><span class="de">Jeder Versand wird als XLSX neben der Quell-PDF protokolliert, die zerlegten Rechnungen liegen in einem eigenen Ordner.</span><span class="en">Every run is logged as XLSX next to the source PDF; the split invoices are saved in their own folder.</span></p></div>
+      <div class="card"><div class="ic">⛨</div><h3><span class="de">Schutz vor Doppelversand</span><span class="en">Duplicate-send protection</span></h3><p><span class="de">Bill2Mail merkt sich versendete PDFs und warnt, wenn dieselbe Datei noch einmal verschickt werden soll.</span><span class="en">Bill2Mail remembers sent PDFs and warns if the same file is about to be sent again.</span></p></div>
+      <div class="card"><div class="ic">⚙</div><h3><span class="de">Tolerant bei Verschiebungen</span><span class="en">Tolerates layout shifts</span></h3><p><span class="de">Rutscht der Rechnungskopf wegen einer längeren Adresse nach unten, wird er trotzdem gefunden. Die Toleranz stellen Sie selbst ein.</span><span class="en">If the invoice header moves down because of a longer address, it is still found. You set the tolerance yourself.</span></p></div>
+      <div class="card"><div class="ic">🔒</div><h3><span class="de">Ihre Daten bleiben bei Ihnen</span><span class="en">Your data stays with you</span></h3><p><span class="de">Keine Cloud, kein Konto. Gesendet wird über Ihren eigenen E-Mail-Server, das Passwort liegt im Windows-Anmeldeinformationsspeicher.</span><span class="en">No cloud, no account. Emails go through your own mail server; the password is kept in the Windows Credential Manager.</span></p></div>
+      <div class="card"><div class="ic">☰</div><h3><span class="de">Kundenliste</span><span class="en">Customer list</span></h3><p><span class="de">Kundennummer, Name und E-Mail-Adresse, direkt im Programm gepflegt. Fehlende Kunden werden in der Vorschau markiert.</span><span class="en">Customer number, name and email address, maintained right in the program. Missing customers are flagged in the preview.</span></p></div>
+      <div class="card"><div class="ic">文</div><h3><span class="de">Deutsch &amp; Englisch</span><span class="en">German &amp; English</span></h3><p><span class="de">Die Oberfläche startet in der Sprache Ihres Windows und lässt sich umschalten.</span><span class="en">The interface starts in your Windows language and can be switched.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Demo & Lizenz -->
+<section id="lizenz">
+  <div class="wrap">
+    <h2><span class="de">Erst ausprobieren, dann lizenzieren</span><span class="en">Try first, then license</span></h2>
+    <p class="sub"><span class="de">Die Demo zeigt alles, bis auf den echten Versand. So sehen Sie an Ihren eigenen Rechnungen, ob Bill2Mail passt.</span><span class="en">The demo shows everything except actual sending, so you can see on your own invoices whether Bill2Mail fits.</span></p>
+    <div class="two">
+      <div class="plan">
+        <h3>Demo</h3>
+        <div class="tag"><span class="de">Kostenlos, ohne Anmeldung</span><span class="en">Free, no sign-up</span></div>
+        <ul>
+          <li><span class="de">Vorlage mit Rahmen erstellen</span><span class="en">Create the frame template</span></li>
+          <li><span class="de">Rechnungen analysieren und Vorschau ansehen</span><span class="en">Analyze invoices and view the preview</span></li>
+          <li><span class="de">Test-Mail an die eigene Adresse</span><span class="en">Test email to your own address</span></li>
+          <li class="no"><span class="de">Versand an Kunden</span><span class="en">Sending to customers</span></li>
+          <li class="no"><span class="de">Ordner-Überwachung</span><span class="en">Folder monitoring</span></li>
+        </ul>
+        <a class="btn ghost" href="https://github.com/Harveyhase68/bill2mail/releases/latest"><span class="de">Demo herunterladen</span><span class="en">Download demo</span></a>
+      </div>
+      <div class="plan pro">
+        <h3><span class="de">Lizenz</span><span class="en">License</span></h3>
+        <div class="tag"><span class="de">Eine Lizenzdatei, offline aktiviert</span><span class="en">One license file, activated offline</span></div>
+        <ul>
+          <li><span class="de">Alles aus der Demo</span><span class="en">Everything in the demo</span></li>
+          <li><span class="de">Versand an Ihre Kunden</span><span class="en">Sending to your customers</span></li>
+          <li><span class="de">Ordner-Überwachung mit Freigabe-Fenster</span><span class="en">Folder monitoring with approval window</span></li>
+          <li><span class="de">Keine Server-Anmeldung, keine Cloud</span><span class="en">No server sign-in, no cloud</span></li>
+        </ul>
+        <a class="btn primary" href="https://www.predl.cc"><span class="de">Lizenz anfragen</span><span class="en">Request a license</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="alt">
+  <div class="wrap faq">
+    <h2>FAQ</h2>
+    <p class="sub"><span class="de">Kurz und ehrlich, auch zu den Grenzen.</span><span class="en">Short and honest, including the limits.</span></p>
+    <details>
+      <summary><span class="de">Funktioniert das mit eingescannten Rechnungen?</span><span class="en">Does it work with scanned invoices?</span></summary>
+      <p><span class="de">Nein, noch nicht. Bill2Mail liest Text aus gedruckten bzw. am PC erzeugten PDFs (z. B. aus Ihrer Fakturierung). Eine Texterkennung (OCR) für Scans ist in dieser Version nicht enthalten.</span><span class="en">Not yet. Bill2Mail reads text from printed or computer-generated PDFs (e.g. from your invoicing software). OCR for scans is not included in this version.</span></p>
+    </details>
+    <details>
+      <summary><span class="de">Welche Rechnungsprogramme werden unterstützt?</span><span class="en">Which invoicing programs are supported?</span></summary>
+      <p><span class="de">Jedes, das eine PDF mit durchsuchbarem Text erzeugt. Sie legen per Rahmen fest, wo Kunden- und Rechnungsnummer stehen, dafür gibt es keine festen Vorlagen.</span><span class="en">Any program that produces a PDF with searchable text. You define the position of the customer and invoice numbers with frames; there are no fixed templates.</span></p>
+    </details>
+    <details>
+      <summary><span class="de">Wohin gehen meine Daten?</span><span class="en">Where does my data go?</span></summary>
+      <p><span class="de">Alles wird lokal auf Ihrem PC verarbeitet. Die Rechnungen verlassen Ihren Rechner nur als E-Mail über den SMTP-Server, den Sie selbst eintragen.</span><span class="en">Everything is processed locally on your PC. Invoices only leave your computer as email through the SMTP server you enter yourself.</span></p>
+    </details>
+    <details>
+      <summary><span class="de">Muss das Programm laufen, damit die Überwachung funktioniert?</span><span class="en">Does the program need to be running for folder monitoring?</span></summary>
+      <p><span class="de">Ja, die Ordner-Überwachung arbeitet, solange Bill2Mail geöffnet ist. Gesendet wird nie automatisch, sondern erst nach Ihrem Klick auf „Versenden“.</span><span class="en">Yes, monitoring works while Bill2Mail is open. Nothing is ever sent automatically; sending happens only after you click “Send”.</span></p>
+    </details>
+    <details>
+      <summary><span class="de">Was brauche ich dafür?</span><span class="en">What do I need?</span></summary>
+      <p><span class="de">Windows 10 oder 11 und die Zugangsdaten eines E-Mail-Servers (SMTP). Das Setup bringt alles Weitere mit.</span><span class="en">Windows 10 or 11 and the login details of an email server (SMTP). The installer brings everything else.</span></p>
+    </details>
+  </div>
+</section>
+
+<!-- Abschluss -->
+<div class="final">
+  <div class="wrap">
+    <h2><span class="de">Nie wieder Rechnungen von Hand verschicken</span><span class="en">Never send invoices by hand again</span></h2>
+    <p class="sub"><span class="de">Laden Sie die Demo und probieren Sie es mit Ihrer eigenen Sammel-PDF.</span><span class="en">Download the demo and try it with your own batch PDF.</span></p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/Harveyhase68/bill2mail/releases/latest"><span class="de">Demo für Windows herunterladen</span><span class="en">Download demo for Windows</span></a>
+      <a class="btn ghost" href="https://www.predl.cc"><span class="de">Kontakt &amp; Lizenz</span><span class="en">Contact &amp; license</span></a>
+    </div>
+  </div>
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Alexander Predl · Bill2Mail</span>
+    <span><a href="https://www.predl.cc">predl.cc</a></span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var KEY = "bill2mail-lang";
+  function saved() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function set(lang) {
+    root.classList.toggle("en", lang === "en");
+    root.lang = lang;
+    document.title = lang === "en"
+      ? "Bill2Mail – split batch PDFs and email invoices"
+      : "Bill2Mail – Sammel-PDFs zerlegen und Rechnungen per E-Mail versenden";
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.content = lang === "en"
+      ? "Bill2Mail reads batch PDFs of invoices, splits them per customer and emails them. Runs locally on your Windows PC, no cloud."
+      : "Bill2Mail liest Sammel-PDFs mit Rechnungen ein, schneidet sie pro Kunde auseinander und versendet sie per E-Mail. Lokal auf Ihrem Windows-PC, ohne Cloud.";
+    try { localStorage.setItem(KEY, lang); } catch (e) {}
+  }
+  var start = saved() || ((navigator.language || "de").toLowerCase().indexOf("de") === 0 ? "de" : "en");
+  set(start);
+  document.getElementById("lang").addEventListener("click", function () {
+    set(root.classList.contains("en") ? "de" : "en");
+  });
+})();
+</script>
 </body>
 </html>
