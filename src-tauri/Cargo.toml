@@ -1,0 +1,39 @@
+[package]
+name = "bill2mail"
+version = "0.1.0"
+description = "Bill2Mail - Sammel-PDFs zerlegen und per Email versenden"
+authors = ["Alexander Predl"]
+edition = "2024"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "bill2mail_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+lopdf = "0.34"
+pdf-extract = "0.7"
+lettre = "0.11"
+rust_xlsxwriter = "0.102.0"
+chrono = "0.4.45"
+keyring = { version = "3", features = ["windows-native"] }
+notify = "8"
+sha2 = "0.10"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bill2Mail</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <div class="brand">Bill2Mail</div>
+      <nav class="tabs">
+        <button class="tab active" data-view="editor">Vorlage &amp; PDF</button>
+        <button class="tab" data-view="versand">Versand</button>
+        <button class="tab" data-view="kunden">Kunden</button>
+        <button class="tab" data-view="einstellungen">Einstellungen</button>
+      </nav>
+    </header>
+
+    <main id="view-editor" class="view">
+      <div class="toolbar">
+        <button id="btn-open" class="primary">PDF öffnen …</button>
+        <span id="file-name" class="file-name">Kein PDF geöffnet</span>
+        <button id="btn-analyse" disabled title="Rahmen auf das geöffnete PDF anwenden und Rechnungen erkennen">Analysieren</button>
+        <span class="spacer"></span>
+        <button id="btn-zoom-out" title="Verkleinern (Strg + Mausrad)">−</button>
+        <span id="zoom-label" class="zoom-label">125 %</span>
+        <button id="btn-zoom-in" title="Vergrößern (Strg + Mausrad)">+</button>
+        <button id="btn-fit" title="An Fensterbreite anpassen">Breite</button>
+      </div>
+      <div id="warning" class="warning" hidden></div>
+      <div class="editor-body">
+        <aside class="sidebar">
+          <h2>Anker-Rahmen</h2>
+          <p class="hint">Rahmentyp wählen, dann auf der Seite einen Rahmen aufziehen. Rahmen lassen sich mit der Maus verschieben und an den Rändern vergrößern. Doppelklick öffnet die Parameter.</p>
+          <div id="palette" class="palette"></div>
+          <p class="hint small">Nur gedruckte (textbasierte) PDFs. Eingescannte Rechnungen werden in dieser Version nicht unterstützt.</p>
+        </aside>
+        <div class="editor-main">
+          <div id="scroller" class="scroller">
+            <div id="empty" class="empty">Öffnen Sie ein PDF mit gedruckten Rechnungen, um die Vorlage festzulegen.</div>
+            <div id="pages" class="pages"></div>
+          </div>
+          <section id="analyse" class="analyse" hidden>
+            <div class="analyse-head">
+              <strong id="analyse-title"></strong>
+              <span class="spacer"></span>
+              <button id="analyse-close" title="Schließen">✕</button>
+            </div>
+            <div id="analyse-body" class="analyse-body"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <main id="view-versand" class="view" hidden>
+      <div class="toolbar">
+        <button id="v-open">PDF wählen …</button>
+        <span id="v-file" class="file-name">Kein PDF gewählt</span>
+        <span class="spacer"></span>
+        <button id="v-vorschau" disabled title="Zeigt, was versendet würde. Es wird nichts gesendet.">1. Vorschau</button>
+        <button id="v-test" title="Schickt eine Test-Mail an die Test-Adresse aus den Einstellungen">2. Test-Mail senden</button>
+        <button id="v-senden" class="primary" disabled>3. Versenden</button>
+        <button id="v-abbrechen" class="danger" hidden>Abbrechen</button>
+      </div>
+      <div id="v-status" class="v-status" hidden></div>
+      <div id="v-body" class="v-body">
+        <div class="empty dark">Rechnungs-PDF wählen, dann „Vorschau“ drücken. Die Rahmen-Vorlage stammt aus dem Tab „Vorlage &amp; PDF“.</div>
+      </div>
+    </main>
+
+    <main id="view-einstellungen" class="view" hidden>
+      <div class="toolbar">
+        <button id="s-save" class="primary">Speichern</button>
+        <button id="s-test">Speichern &amp; Test-Mail senden</button>
+        <span id="s-status" class="status"></span>
+      </div>
+      <form id="s-form" class="settings" autocomplete="off" onsubmit="return false">
+        <fieldset>
+          <legend>E-Mail-Server (SMTP)</legend>
+          <label>Server<input id="s-host" placeholder="smtp.firma.at" /></label>
+          <label>Port<input id="s-port" type="number" min="1" max="65535" /></label>
+          <label>Verschlüsselung
+            <select id="s-sicherheit">
+              <option value="starttls">STARTTLS (Port 587)</option>
+              <option value="ssl">SSL/TLS (Port 465)</option>
+              <option value="keine">Keine (nur für Tests im lokalen Netz)</option>
+            </select>
+          </label>
+          <label>Benutzer<input id="s-user" /></label>
+          <label>Passwort<input id="s-pass" type="password" autocomplete="new-password" /></label>
+          <p class="hint small">Das Passwort wird im Windows-Anmeldeinformationsspeicher abgelegt, nicht in der Datenbank.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Absender &amp; Test</legend>
+          <label>Absender-Adresse<input id="s-absender" placeholder="rechnungen@firma.at" /></label>
+          <label>Absender-Name<input id="s-absender-name" placeholder="Buchhaltung Musterfirma" /></label>
+          <label>Test-Empfänger<input id="s-test-an" placeholder="ihre.adresse@firma.at" /></label>
+        </fieldset>
+        <fieldset class="wide">
+          <legend>Erkennung</legend>
+          <label>Toleranz der Rahmen (in Punkten, 0–200)<input id="s-toleranz" type="number" min="0" max="200" step="1" /></label>
+          <p class="hint small">Wie weit der Text vertikal vom Rahmen abweichen darf und trotzdem gefunden wird (z. B. wenn die Adresse eine Zeile länger ist). 72 Punkte = 1 Zoll = 2,54 cm; eine Textzeile hat etwa 10–12 Punkte. Standard: 30. Zu große Werte können fremden Text treffen.</p>
+        </fieldset>
+        <fieldset class="wide">
+          <legend>Automatik: PDF-Ordner überwachen</legend>
+          <label class="check"><input id="s-ue-aktiv" type="checkbox" /> Neue PDFs in diesem Ordner automatisch erkennen und das Versand-Fenster öffnen</label>
+          <div class="folder-row">
+            <input id="s-ue-ordner" placeholder="C:\Rechnungen\Eingang" />
+            <button id="s-ue-pick" type="button">Ordner wählen …</button>
+          </div>
+          <p class="hint small">Das Programm wartet, bis die PDF fertig geschrieben und nicht mehr gesperrt ist. Gesendet wird erst nach Klick auf „Versenden“. Das Programm muss dafür geöffnet sein.</p>
+          <p id="s-ue-status" class="hint small"></p>
+        </fieldset>
+        <fieldset class="wide">
+          <legend>E-Mail an den Kunden</legend>
+          <label>Betreff<input id="s-betreff" /></label>
+          <label>Text (HTML)<textarea id="s-text" rows="8" spellcheck="false"></textarea></label>
+          <p class="hint small"><code>{KUNDENNAME}</code> wird durch den Kundennamen ersetzt, im Betreff und im Text.</p>
+        </fieldset>
+      </form>
+    </main>
+
+    <main id="view-kunden" class="view" hidden>
+      <div class="toolbar">
+        <input id="kunden-filter" type="search" placeholder="Suchen …" />
+        <span id="kunden-count" class="file-name"></span>
+        <span class="spacer"></span>
+        <span id="kunden-status" class="status"></span>
+      </div>
+      <div class="kunden-wrap">
+        <table class="kunden">
+          <thead>
+            <tr><th>Kundennummer</th><th>Kundenname</th><th>E-Mail <small>(mehrere mit ; trennen)</small></th><th></th></tr>
+            <tr class="new-row">
+              <th><input id="new-nr" placeholder="Nummer" /></th>
+              <th><input id="new-name" placeholder="Name (für die Anrede im Email)" /></th>
+              <th><input id="new-email" placeholder="name@firma.at" /></th>
+              <th><button id="btn-add" class="primary">Hinzufügen</button></th>
+            </tr>
+          </thead>
+          <tbody id="kunden-body"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <div id="auto" class="modal-backdrop" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="auto-title">
+        <div class="modal-head">
+          <strong id="auto-title">Neue PDF erkannt</strong>
+          <span id="auto-queue" class="hint"></span>
+        </div>
+        <div id="auto-file" class="modal-file"></div>
+        <div id="auto-body" class="modal-body"></div>
+        <div class="modal-foot">
+          <span id="auto-hinweis" class="hint"></span>
+          <span class="spacer"></span>
+          <button id="auto-abbrechen">Abbrechen</button>
+          <button id="auto-senden" class="primary">Versenden</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="dlg" class="dlg" hidden>
+      <div class="dlg-head"><span id="dlg-dot" class="dot"></span><strong id="dlg-title"></strong></div>
+      <p id="dlg-hint" class="hint"></p>
+      <textarea id="dlg-text" rows="3" spellcheck="false"></textarea>
+      <div class="dlg-actions">
+        <button id="dlg-delete" class="danger">Rahmen löschen</button>
+        <span class="spacer"></span>
+        <button id="dlg-cancel">Abbrechen</button>
+        <button id="dlg-ok" class="primary">Übernehmen</button>
+      </div>
+    </div>
+  </body>
+</html>
