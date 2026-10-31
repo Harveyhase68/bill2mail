@@ -2,6 +2,7 @@ mod db;
 mod i18n;
 mod lizenz;
 mod mail;
+mod oauth;
 mod parser;
 mod pdf_text;
 mod protokoll;
@@ -28,6 +29,7 @@ struct AppState {
     ueberwachung: Mutex<Option<ueberwachung::Ueberwachung>>,
     ueberwachung_status: Mutex<UeberwachungsStatus>,
     datenordner: std::path::PathBuf,
+    oauth_abbruch: Arc<AtomicBool>,
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -173,7 +175,7 @@ async fn test_mail_senden(state: State<'_, AppState>) -> Result<String, String> 
         return Err(tr("Bitte zuerst eine Test-Empfängeradresse in den Einstellungen eintragen.", "Please enter a test recipient address in the settings first."));
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let m = mail::Mailer::neu(&e, settings::passwort_lesen().as_deref())?;
+        let m = mail::Mailer::neu(&e, settings::zugang(&e)?.as_deref())?;
         m.test(&empfaenger)?;
         Ok(format!("Test-Mail an {empfaenger} gesendet."))
     })
@@ -261,7 +263,7 @@ async fn versenden(
     let (ergebnis, hash) = tauri::async_runtime::spawn_blocking(move || {
         let bytes = std::fs::read(&path).map_err(|e| format!("PDF konnte nicht gelesen werden: {e}"))?;
         let analyse = pdf_analysieren(&bytes, &frames, &kunden, e.toleranz_pt)?;
-        let passwort = settings::passwort_lesen();
+        let passwort = settings::zugang(&e)?;
         let ergebnis = versand::ausfuehren(std::path::Path::new(&path), &bytes, &analyse, &e, passwort.as_deref(), &abbrechen, &mut |aktuell, gesamt, text| {
             let _ = app.emit("versand-fortschritt", Fortschritt { aktuell, gesamt, text: text.to_string() });
         })?;
@@ -333,6 +335,7 @@ pub fn run() {
                 ueberwachung: Mutex::new(None),
                 ueberwachung_status: Mutex::new(UeberwachungsStatus::default()),
                 datenordner: dir.clone(),
+                oauth_abbruch: Arc::new(AtomicBool::new(false)),
             });
             ueberwachung_anwenden(app.handle(), &einstellungen);
             Ok(())
@@ -355,6 +358,10 @@ pub fn run() {
             lizenz_installieren,
             sprache_system,
             sprache_setzen,
+            oauth_status,
+            oauth_anmelden,
+            oauth_abbrechen,
+            oauth_abmelden,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten von Bill2Mail");
@@ -386,4 +393,58 @@ fn sprache_system() -> String {
 #[tauri::command]
 fn sprache_setzen(englisch: bool) {
     i18n::setzen(englisch);
+}
+
+// ------------------------------------------------------------------- OAuth
+
+#[derive(Serialize)]
+struct OauthAnbieterStatus {
+    konfiguriert: bool,
+    angemeldet: bool,
+}
+
+#[derive(Serialize)]
+struct OauthStatus {
+    google: OauthAnbieterStatus,
+    microsoft: OauthAnbieterStatus,
+}
+
+fn oauth_anbieter(name: &str) -> Result<oauth::Anbieter, String> {
+    match name {
+        "google" => Ok(oauth::Anbieter::Google),
+        "microsoft" => Ok(oauth::Anbieter::Microsoft),
+        _ => Err(format!("Unbekannter Anbieter: {name}")),
+    }
+}
+
+#[tauri::command]
+fn oauth_status() -> OauthStatus {
+    let s = |a: oauth::Anbieter| OauthAnbieterStatus { konfiguriert: a.konfiguriert(), angemeldet: oauth::angemeldet(a) };
+    OauthStatus { google: s(oauth::Anbieter::Google), microsoft: s(oauth::Anbieter::Microsoft) }
+}
+
+/// Öffnet den Browser zur Anmeldung und wartet auf das Ergebnis. Gibt die Konto-Adresse zurück (kann leer sein).
+#[tauri::command]
+async fn oauth_anmelden(app: AppHandle, state: State<'_, AppState>, anbieter: String, hinweis: String) -> Result<String, String> {
+    use tauri_plugin_opener::OpenerExt;
+    let a = oauth_anbieter(&anbieter)?;
+    let abbruch = state.oauth_abbruch.clone();
+    abbruch.store(false, Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || {
+        let oeffnen = |url: &str| app.opener().open_url(url, None::<&str>).map_err(|e| tr(&format!("Browser konnte nicht geöffnet werden: {e}"), &format!("The browser could not be opened: {e}")));
+        oauth::anmelden(a, Some(hinweis.as_str()), &oeffnen, &abbruch).map(|m| m.unwrap_or_default())
+    })
+    .await
+    .map_err(fehler)?
+}
+
+#[tauri::command]
+fn oauth_abbrechen(state: State<AppState>) {
+    state.oauth_abbruch.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn oauth_abmelden(anbieter: String) -> Result<(), String> {
+    oauth::abmelden(oauth_anbieter(&anbieter)?);
+    Ok(())
 }

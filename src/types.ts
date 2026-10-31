@@ -94,6 +94,7 @@ export interface Einstellungen {
   smtp_port: number;
   sicherheit: "keine" | "starttls" | "ssl";
   smtp_user: string;
+  anmeldung: "passwort" | "google" | "microsoft";
   absender: string;
   absender_name: string;
   betreff: string;
@@ -102,6 +103,11 @@ export interface Einstellungen {
   ueberwachung_aktiv: boolean;
   ueberwachung_ordner: string;
   toleranz_pt: number;
+}
+
+export interface OauthStatus {
+  google: { konfiguriert: boolean; angemeldet: boolean };
+  microsoft: { konfiguriert: boolean; angemeldet: boolean };
 }
 
 export interface UeberwachungsStatus {

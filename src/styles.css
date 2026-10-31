@@ -315,3 +315,7 @@ button:disabled:hover { border-color: var(--line); }
 .demo-banner[hidden] { display: none; }
 .lic-status { margin: 0; font-weight: 600; }
 .lic-status.error { color: var(--danger); }
+
+.oauth { display: flex; flex-direction: column; gap: 8px; }
+.oauth[hidden], #s-pass-block[hidden] { display: none; }
+#s-pass-block { display: flex; flex-direction: column; gap: 8px; }

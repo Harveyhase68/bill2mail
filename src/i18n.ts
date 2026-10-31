@@ -147,6 +147,21 @@ const EN: Record<string, string> = {
   Verschlüsselung: "Encryption",
   "Keine (nur für Tests im lokalen Netz)": "None (only for tests on the local network)",
   Benutzer: "User",
+  Anmeldung: "Sign-in",
+  "Benutzer & Passwort": "User & password",
+  "Google (Gmail) – Anmeldung im Browser": "Google (Gmail) – sign in via browser",
+  "Microsoft (Outlook.com) – Anmeldung im Browser": "Microsoft (Outlook.com) – sign in via browser",
+  "Im Browser anmelden …": "Sign in via browser …",
+  Abmelden: "Sign out",
+  "Gmail und Outlook.com erlauben das normale Passwort nicht mehr. Bei der Anmeldung im Browser sehen Sie die Seite des Anbieters, Bill2Mail erfährt Ihr Passwort nie. Alternative: ein App-Passwort des Kontos als Passwort verwenden.":
+    "Gmail and Outlook.com no longer accept the normal password. When you sign in via the browser you see the provider's own page; Bill2Mail never learns your password. Alternative: use an app password of the account as the password.",
+  "Anmeldung mit {n} ist in dieser Programmversion nicht eingerichtet. Bitte Benutzer & Passwort (bzw. App-Passwort) verwenden.":
+    "Sign-in with {n} is not set up in this version of the program. Please use user & password (or an app password).",
+  "Angemeldet bei {n}.": "Signed in to {n}.",
+  "Nicht angemeldet.": "Not signed in.",
+  "Browser geöffnet – bitte dort anmelden und die Berechtigung erteilen …": "Browser opened – please sign in there and grant the permission …",
+  "Angemeldet.": "Signed in.",
+  "Abgemeldet.": "Signed out.",
   Passwort: "Password",
   "Das Passwort wird im Windows-Anmeldeinformationsspeicher abgelegt, nicht in der Datenbank.":
     "The password is stored in the Windows Credential Manager, not in the database.",

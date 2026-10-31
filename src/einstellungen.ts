@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { spracheWechseln, sprache, t, type Sprache } from "./i18n";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Einstellungen, LizenzStatus, UeberwachungsStatus } from "./types";
+import type { Einstellungen, LizenzStatus, OauthStatus, UeberwachungsStatus } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
@@ -20,6 +20,10 @@ export class EinstellungenView {
       void this.save().catch(() => {}).finally(() => spracheWechseln(neu));
     });
     $("s-lic-load").addEventListener("click", () => void this.lizenzLaden());
+    $<HTMLSelectElement>("s-anm").addEventListener("change", () => this.anmeldungGewaehlt());
+    $("s-oauth-login").addEventListener("click", () => void this.oauthAnmelden());
+    $("s-oauth-cancel").addEventListener("click", () => void invoke("oauth_abbrechen"));
+    $("s-oauth-logout").addEventListener("click", () => void this.oauthAbmelden());
     $("s-ue-pick").addEventListener("click", async () => {
       const dir = await open({ directory: true, multiple: false });
       if (typeof dir === "string") input("s-ue-ordner").value = dir;
@@ -39,6 +43,77 @@ export class EinstellungenView {
     el.classList.toggle("error", isError);
     clearTimeout(this.statusTimer);
     if (msg && !isError) this.statusTimer = window.setTimeout(() => (el.textContent = ""), 6000);
+  }
+
+  private anbieter(): "google" | "microsoft" | null {
+    const v = $<HTMLSelectElement>("s-anm").value;
+    return v === "google" || v === "microsoft" ? v : null;
+  }
+
+  /** Server-Voreinstellung beim Wechsel der Anmeldeart (nur wenn noch kein eigener Server eingetragen ist). */
+  private anmeldungGewaehlt() {
+    const voreinst: Record<string, string> = { google: "smtp.gmail.com", microsoft: "smtp-mail.outlook.com" };
+    const bekannt = Object.values(voreinst);
+    const a = this.anbieter();
+    const host = input("s-host").value.trim();
+    if (a && (host === "" || bekannt.includes(host))) {
+      input("s-host").value = voreinst[a];
+      input("s-port").value = "587";
+      $<HTMLSelectElement>("s-sicherheit").value = "starttls";
+    }
+    void this.oauthAnzeigen();
+  }
+
+  private async oauthAnzeigen() {
+    const a = this.anbieter();
+    $("s-pass-block").hidden = a !== null;
+    $("s-oauth").hidden = a === null;
+    if (!a) return;
+    const s = (await invoke<OauthStatus>("oauth_status"))[a];
+    const name = a === "google" ? "Google" : "Microsoft";
+    const st = $("s-oauth-status");
+    st.classList.toggle("error", !s.konfiguriert);
+    st.textContent = !s.konfiguriert
+      ? t("Anmeldung mit {n} ist in dieser Programmversion nicht eingerichtet. Bitte Benutzer & Passwort (bzw. App-Passwort) verwenden.", { n: name })
+      : s.angemeldet
+        ? t("Angemeldet bei {n}.", { n: name })
+        : t("Nicht angemeldet.");
+    $<HTMLButtonElement>("s-oauth-login").disabled = !s.konfiguriert;
+    $<HTMLButtonElement>("s-oauth-logout").disabled = !s.angemeldet;
+  }
+
+  private async oauthAnmelden() {
+    const a = this.anbieter();
+    if (!a) return;
+    $("s-oauth-login").hidden = true;
+    $("s-oauth-logout").hidden = true;
+    $("s-oauth-cancel").hidden = false;
+    $("s-oauth-status").classList.remove("error");
+    $("s-oauth-status").textContent = t("Browser geöffnet – bitte dort anmelden und die Berechtigung erteilen …");
+    try {
+      const mail = await invoke<string>("oauth_anmelden", { anbieter: a, hinweis: input("s-user").value.trim() });
+      if (mail) {
+        input("s-user").value = mail;
+        if (!input("s-absender").value.trim()) input("s-absender").value = mail;
+      }
+      await this.save();
+      this.status(t("Angemeldet."));
+    } catch (e) {
+      this.status(String(e), true);
+    } finally {
+      $("s-oauth-login").hidden = false;
+      $("s-oauth-logout").hidden = false;
+      $("s-oauth-cancel").hidden = true;
+      await this.oauthAnzeigen();
+    }
+  }
+
+  private async oauthAbmelden() {
+    const a = this.anbieter();
+    if (!a) return;
+    await invoke("oauth_abmelden", { anbieter: a });
+    this.status(t("Abgemeldet."));
+    await this.oauthAnzeigen();
   }
 
   /** Zeigt den Lizenzstatus in den Einstellungen und im Demo-Banner. */
@@ -84,6 +159,8 @@ export class EinstellungenView {
     input("s-port").value = String(e.smtp_port);
     $<HTMLSelectElement>("s-sicherheit").value = e.sicherheit;
     input("s-user").value = e.smtp_user;
+    $<HTMLSelectElement>("s-anm").value = e.anmeldung ?? "passwort";
+    void this.oauthAnzeigen();
     input("s-pass").value = "";
     input("s-pass").placeholder = e.passwort_gesetzt ? t("(gespeichert – leer lassen zum Beibehalten)") : "";
     input("s-absender").value = e.absender;
@@ -99,6 +176,7 @@ export class EinstellungenView {
       smtp_port: Number(input("s-port").value) || 587,
       sicherheit: $<HTMLSelectElement>("s-sicherheit").value as Einstellungen["sicherheit"],
       smtp_user: input("s-user").value.trim(),
+      anmeldung: $<HTMLSelectElement>("s-anm").value as Einstellungen["anmeldung"],
       absender: input("s-absender").value.trim(),
       absender_name: input("s-absender-name").value.trim(),
       betreff: input("s-betreff").value,

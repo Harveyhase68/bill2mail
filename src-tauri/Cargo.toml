@@ -33,6 +33,8 @@ chrono = "0.4.45"
 keyring = { version = "3", features = ["windows-native"] }
 notify = "8"
 sha2 = "0.10"
+ureq = "3"
+getrandom = "0.3"
 
 [profile.release]
 codegen-units = 1

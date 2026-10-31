@@ -1,5 +1,5 @@
 use crate::i18n::tr;
-use crate::settings::{Einstellungen, Sicherheit};
+use crate::settings::{Anmeldung, Einstellungen, Sicherheit};
 use lettre::message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{Address, Message, SmtpTransport, Transport};
@@ -85,7 +85,15 @@ impl Mailer {
         }
         .port(e.smtp_port)
         .timeout(Some(Duration::from_secs(30)));
-        if !e.smtp_user.trim().is_empty() {
+        if e.anmeldung != Anmeldung::Passwort {
+            // OAuth: `passwort` ist das Access-Token, der Benutzer die E-Mail-Adresse des Kontos
+            if e.smtp_user.trim().is_empty() {
+                return Err(tr("Bitte zuerst im Feld „Benutzer“ die E-Mail-Adresse des Kontos eintragen.", "Please enter the account's email address in the “User” field first."));
+            }
+            builder = builder
+                .credentials(Credentials::new(e.smtp_user.trim().to_string(), passwort.unwrap_or_default().to_string()))
+                .authentication(vec![Mechanism::Xoauth2]);
+        } else if !e.smtp_user.trim().is_empty() {
             builder = builder
                 .credentials(Credentials::new(e.smtp_user.trim().to_string(), passwort.unwrap_or_default().to_string()))
                 .authentication(vec![Mechanism::Plain, Mechanism::Login]);
@@ -159,7 +167,11 @@ pub mod testserver {
                         }
                         let cmd = line.trim().to_uppercase();
                         if cmd.starts_with("EHLO") || cmd.starts_with("HELO") {
-                            let _ = w.write_all(b"250 test\r\n");
+                            let _ = w.write_all(b"250-test\r\n250 AUTH XOAUTH2 PLAIN LOGIN\r\n");
+                        } else if cmd.starts_with("AUTH") {
+                            // Anmeldung festhalten (Originalschreibweise), immer erfolgreich
+                            m.lock().unwrap().push(format!("AUTH: {}", line.trim()));
+                            let _ = w.write_all(b"235 ok\r\n");
                         } else if cmd.starts_with("DATA") {
                             let _ = w.write_all(b"354 go\r\n");
                             let mut data = String::new();
@@ -215,6 +227,27 @@ mod tests {
         assert_eq!(text_mit_name("<p>{KUNDENNAME}</p>", "Müller & <Söhne>"), "<p>Müller &amp; &lt;Söhne&gt;</p>");
         assert_eq!(betreff_mit_name("Re: {KUNDENNAME}", "A & B"), "Re: A & B");
         assert_eq!(html_zu_text("<p>Hallo <b>A &amp; B</b></p><p>Tschüss</p>"), "Hallo A & B\nTschüss");
+    }
+
+    #[test]
+    fn oauth_meldet_sich_per_xoauth2_an() {
+        let (port, mails) = testserver::start();
+        let e = Einstellungen {
+            anmeldung: Anmeldung::Google,
+            smtp_user: "vater@gmail.com".into(),
+            ..testserver::einstellungen(port)
+        };
+        let m = Mailer::neu(&e, Some("TOKEN123")).unwrap();
+        m.test("ich@firma.at").unwrap();
+        let alle = mails.lock().unwrap();
+        let auth = alle.iter().find(|z| z.starts_with("AUTH:")).expect("keine Anmeldung");
+        assert!(auth.contains("XOAUTH2"), "{auth}");
+        let b64 = auth.rsplit(' ').next().unwrap();
+        let roh = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64).unwrap();
+        assert_eq!(String::from_utf8(roh).unwrap(), "user=vater@gmail.com\x01auth=Bearer TOKEN123\x01\x01");
+        // ohne Benutzer-Adresse gibt es eine verständliche Meldung
+        let ohne = Einstellungen { smtp_user: String::new(), ..e };
+        assert!(Mailer::neu(&ohne, Some("x")).unwrap_err().contains("Benutzer"));
     }
 
     #[test]

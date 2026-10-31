@@ -90,9 +90,27 @@
               <option value="keine">Keine (nur für Tests im lokalen Netz)</option>
             </select>
           </label>
+          <label>Anmeldung
+            <select id="s-anm">
+              <option value="passwort">Benutzer &amp; Passwort</option>
+              <option value="google">Google (Gmail) – Anmeldung im Browser</option>
+              <option value="microsoft">Microsoft (Outlook.com) – Anmeldung im Browser</option>
+            </select>
+          </label>
           <label>Benutzer<input id="s-user" /></label>
-          <label>Passwort<input id="s-pass" type="password" autocomplete="new-password" /></label>
-          <p class="hint small">Das Passwort wird im Windows-Anmeldeinformationsspeicher abgelegt, nicht in der Datenbank.</p>
+          <div id="s-pass-block">
+            <label>Passwort<input id="s-pass" type="password" autocomplete="new-password" /></label>
+            <p class="hint small">Das Passwort wird im Windows-Anmeldeinformationsspeicher abgelegt, nicht in der Datenbank.</p>
+          </div>
+          <div id="s-oauth" class="oauth" hidden>
+            <p id="s-oauth-status" class="lic-status"></p>
+            <div class="folder-row">
+              <button id="s-oauth-login" type="button">Im Browser anmelden …</button>
+              <button id="s-oauth-cancel" type="button" hidden>Abbrechen</button>
+              <button id="s-oauth-logout" type="button">Abmelden</button>
+            </div>
+            <p class="hint small">Gmail und Outlook.com erlauben das normale Passwort nicht mehr. Bei der Anmeldung im Browser sehen Sie die Seite des Anbieters, Bill2Mail erfährt Ihr Passwort nie. Alternative: ein App-Passwort des Kontos als Passwort verwenden.</p>
+          </div>
         </fieldset>
         <fieldset>
           <legend>Absender &amp; Test</legend>

@@ -9,6 +9,29 @@ pub enum Sicherheit {
     Ssl,
 }
 
+/// Wie sich Bill2Mail beim SMTP-Server anmeldet
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Anmeldung {
+    /// Benutzer und Passwort (bzw. App-Passwort)
+    #[default]
+    Passwort,
+    /// OAuth 2.0 mit Google (Gmail)
+    Google,
+    /// OAuth 2.0 mit Microsoft (Outlook.com, Microsoft 365)
+    Microsoft,
+}
+
+impl Anmeldung {
+    pub fn anbieter(self) -> Option<crate::oauth::Anbieter> {
+        match self {
+            Anmeldung::Passwort => None,
+            Anmeldung::Google => Some(crate::oauth::Anbieter::Google),
+            Anmeldung::Microsoft => Some(crate::oauth::Anbieter::Microsoft),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Einstellungen {
@@ -16,6 +39,7 @@ pub struct Einstellungen {
     pub smtp_port: u16,
     pub sicherheit: Sicherheit,
     pub smtp_user: String,
+    pub anmeldung: Anmeldung,
     pub absender: String,
     pub absender_name: String,
     pub betreff: String,
@@ -36,6 +60,7 @@ impl Default for Einstellungen {
             smtp_port: 587,
             sicherheit: Sicherheit::Starttls,
             smtp_user: String::new(),
+            anmeldung: Anmeldung::Passwort,
             absender: String::new(),
             absender_name: String::new(),
             betreff: "Ihre Rechnung".into(),
@@ -58,6 +83,15 @@ fn eintrag() -> Result<keyring::Entry, String> {
 /// Das SMTP-Passwort liegt im Windows-Anmeldeinformationsspeicher, nicht in der Datenbank.
 pub fn passwort_lesen() -> Option<String> {
     eintrag().ok()?.get_password().ok()
+}
+
+/// Geheimnis für den SMTP-Login: das gespeicherte Passwort oder ein frisches OAuth-Access-Token.
+/// Macht bei OAuth einen Netzwerkaufruf, daher nur außerhalb des UI-Threads aufrufen.
+pub fn zugang(e: &Einstellungen) -> Result<Option<String>, String> {
+    match e.anmeldung.anbieter() {
+        None => Ok(passwort_lesen()),
+        Some(a) => crate::oauth::access_token(a).map(Some),
+    }
 }
 
 pub fn passwort_speichern(passwort: &str) -> Result<(), String> {
